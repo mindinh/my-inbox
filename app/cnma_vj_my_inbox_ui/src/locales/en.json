@@ -1,0 +1,35 @@
+{
+    "common": {
+        "confirm": "Confirm",
+        "cancel": "Cancel",
+        "save": "Save",
+        "delete": "Delete",
+        "edit": "Edit",
+        "create": "Create",
+        "search": "Search",
+        "filter": "Filter",
+        "refresh": "Refresh",
+        "back": "Back",
+        "close": "Close",
+        "loading": "Loading...",
+        "noData": "No data available",
+        "error": "An error occurred",
+        "success": "Success",
+        "warning": "Warning",
+        "actions": "Actions",
+        "status": "Status",
+        "yes": "Yes",
+        "no": "No",
+        "approve": "Approve",
+        "reject": "Reject",
+        "submit": "Submit"
+    },
+    "inbox": {
+        "title": "My Inbox",
+        "tasks": "Tasks",
+        "noTasks": "No tasks available",
+        "pending": "Pending",
+        "completed": "Completed",
+        "overdue": "Overdue"
+    }
+}

@@ -1,0 +1,60 @@
+# Node modules
+node_modules/
+
+# Build outputs
+gen/
+gen_backup/
+dist/
+*.mtar
+mta-op-*/
+Makefile_*.mta
+
+# Credentials - NEVER COMMIT
+default-env.json
+.env
+*.pem
+btp-env-data.txt
+
+# CDS private config (may contain credentials)
+
+
+# SQLite database
+*.sqlite
+db.sqlite
+
+# Logs
+*.log
+npm-debug.log*
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build & lint output logs
+build_log.txt
+build-output.txt
+lint_output.txt
+lint_latest.txt
+
+# Test outputs
+test/testResult/
+coverage/
+
+# TypeScript
+*.tsbuildinfo
+
+# added by cds
+.cdsrc-private.json
+
+./router/*
+./@cds-models/*
+.agent/
+.claude/
+.opencode/
+.gemini/

@@ -1,0 +1,220 @@
+_schema-version: "3.3.0"
+ID: cnma-vj-my-inbox
+version: 1.0.0
+description: "CNMA VJ My Inbox - Workflow task management and approvals"
+
+parameters:
+  enable-parallel-deployments: true
+
+build-parameters:
+  before-all:
+    - builder: custom
+      commands:
+        - npm install
+        - npx -p @sap/cds-dk cds build --production
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#                              MODULES
+# ═══════════════════════════════════════════════════════════════════════════════
+
+modules:
+  # ─────────────────────────────────────────────────────────────────────────────
+  # CAP Backend Server
+  # ─────────────────────────────────────────────────────────────────────────────
+  - name: cnma-vj-my-inbox-srv
+    type: nodejs
+    path: gen/srv
+    parameters:
+      buildpack: nodejs_buildpack
+      memory: 512M
+      disk-quota: 1024M
+    properties:
+      SAP_USE_DESTINATION: "true"
+      SAP_TASK_DESTINATION: "SAP_ABAP_BACKEND"
+      SAP_TASK_CLIENT: "100"
+      USE_MOCK_SAP: "false"
+    build-parameters:
+      builder: npm
+      ignore:
+        - "node_modules/"
+    requires:
+      - name: cnma-vj-my-inbox-auth
+      - name: cnma-vj-my-inbox-destination
+      - name: cnma-vj-my-inbox-connectivity
+    provides:
+      - name: srv-api
+        properties:
+          srv-url: ${default-url}
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Standalone App Router (Direct URL access)
+  # ─────────────────────────────────────────────────────────────────────────────
+  - name: cnma-vj-my-inbox-approuter
+    type: approuter.nodejs
+    path: app/router
+    parameters:
+      memory: 256M
+      disk-quota: 512M
+    requires:
+      - name: cnma-vj-my-inbox-auth
+      - name: srv-api
+        group: destinations
+        properties:
+          name: srv-api
+          url: ~{srv-url}
+          forwardAuthToken: true
+          timeout: 300000
+    build-parameters:
+      ignore:
+        - "node_modules/"
+      requires:
+        - name: cnma-vj-my-inbox-ui
+          artifacts:
+            - ./*
+          target-path: resources/cnma
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # React Frontend UI Build
+  # ─────────────────────────────────────────────────────────────────────────────
+  - name: cnma-vj-my-inbox-ui
+    type: html5
+    path: app/cnma_vj_my_inbox_ui
+    build-parameters:
+      builder: custom
+      commands:
+        - npm install
+        - npm run build
+      supported-platforms: []
+      build-result: dist
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # UI Deployer (pushes UI zip to HTML5 App Repo for WorkZone)
+  # ─────────────────────────────────────────────────────────────────────────────
+  - name: cnma-vj-my-inbox-ui-deployer
+    type: com.sap.application.content
+    path: .
+    requires:
+      - name: cnma-vj-my-inbox-html5-repo-host
+        parameters:
+          content-target: true
+    build-parameters:
+      memory: 256M
+      disk-quota: 1024M
+      ignore:
+        - "*node_modules*"
+      build-result: ui_resources
+      requires:
+        - name: cnma-vj-my-inbox-ui
+          artifacts:
+            - cnma_vj_my_inbox_ui.zip
+          target-path: ui_resources/
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Destination Content Registry (for WorkZone managed app router)
+  # ─────────────────────────────────────────────────────────────────────────────
+  - name: cnma-vj-my-inbox-destination-content
+    type: com.sap.application.content
+    requires:
+      - name: srv-api
+
+      - name: cnma-vj-my-inbox-destination
+        parameters:
+          content-target: true
+
+      - name: cnma-vj-my-inbox-auth
+        parameters:
+          service-key:
+            name: cnma-vj-my-inbox-auth-key
+
+      - name: cnma-vj-my-inbox-html5-repo-host
+        parameters:
+          service-key:
+            name: cnma-vj-my-inbox-html5-repo-host-key
+
+    build-parameters:
+      no-source: true
+    parameters:
+      content:
+        instance:
+          existing_destinations_policy: update
+          destinations:
+            # XSUAA Destination
+            - Name: cnma_vj_my_inbox_xsuaa_dest
+              Authentication: OAuth2UserTokenExchange
+              ServiceInstanceName: cnma-vj-my-inbox-auth
+              ServiceKeyName: cnma-vj-my-inbox-auth-key
+              sap.cloud.service: cnma.vjinbox
+
+            # Html5 Repo Destination
+            - Name: cnma_vj_my_inbox_html5_repo_host_dest
+              Authentication: OAuth2UserTokenExchange
+              ServiceInstanceName: cnma-vj-my-inbox-html5-repo-host
+              ServiceKeyName: cnma-vj-my-inbox-html5-repo-host-key
+              sap.cloud.service: cnma.vjinbox
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#                              RESOURCES
+# ═══════════════════════════════════════════════════════════════════════════════
+
+resources:
+  # ─────────────────────────────────────────────────────────────────────────────
+  # XSUAA (Authentication & Authorization)
+  # ─────────────────────────────────────────────────────────────────────────────
+  - name: cnma-vj-my-inbox-auth
+    type: org.cloudfoundry.managed-service
+    parameters:
+      service: xsuaa
+      service-plan: application
+      path: ./xs-security.json
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Destination Service (for SAP backend + WorkZone routing)
+  # ─────────────────────────────────────────────────────────────────────────────
+  - name: cnma-vj-my-inbox-destination
+    type: org.cloudfoundry.managed-service
+    requires:
+      - name: srv-api
+    parameters:
+      service: destination
+      service-plan: lite
+      config:
+        version: 1.0.0
+        forwardAuthToken: true
+        HTML5Runtime_enabled: true
+        init_data:
+          instance:
+            existing_destinations_policy: update
+            destinations:
+              - Name: cnma_vj_my_inbox_destination
+                Description: CNMA VJ My Inbox Service Destination
+                Authentication: NoAuthentication
+                Type: HTTP
+                ProxyType: Internet
+                URL: ~{srv-api/srv-url}
+                HTML5.DynamicDestination: true
+                HTML5.ForwardAuthToken: true
+                HTML5.Timeout: 600000
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Connectivity Service (for on-premise destinations via Cloud Connector)
+  # ─────────────────────────────────────────────────────────────────────────────
+  - name: cnma-vj-my-inbox-connectivity
+    type: org.cloudfoundry.managed-service
+    parameters:
+      service: connectivity
+      service-plan: lite
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # HTML5 Application Repository (for WorkZone)
+  # ─────────────────────────────────────────────────────────────────────────────
+  - name: cnma-vj-my-inbox-html5-repo-host
+    type: org.cloudfoundry.managed-service
+    parameters:
+      service: html5-apps-repo
+      service-plan: app-host
+
+  - name: cnma-vj-my-inbox-html5-runtime
+    type: org.cloudfoundry.managed-service
+    parameters:
+      service: html5-apps-repo
+      service-plan: app-runtime

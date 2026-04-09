@@ -1,0 +1,41 @@
+{
+  "_version": "1.21.0",
+  "sap.app": {
+    "id": "cnma.vjinbox",
+    "type": "application",
+    "i18n": "i18n/i18n.properties",
+    "applicationVersion": {
+      "version": "1.0.0"
+    },
+    "title": "My Inbox",
+    "description": "Workflow Task Management and Approvals",
+    "crossNavigation": {
+      "inbounds": {
+        "vj_inbox_inbound": {
+          "signature": {
+            "parameters": {},
+            "additionalParameters": "allowed"
+          },
+          "semanticObject": "vj_inbox",
+          "action": "manage"
+        }
+      }
+    }
+  },
+  "sap.cloud": {
+    "public": true,
+    "service": "cnma.vjinbox"
+  },
+  "sap.ui": {
+    "technology": "UI5",
+    "fullWidth": true,
+    "icons": {
+      "icon": "sap-icon://inbox"
+    },
+    "deviceTypes": {
+      "desktop": true,
+      "tablet": true,
+      "phone": true
+    }
+  }
+}

@@ -1,0 +1,16 @@
+{
+    "extends": "./tsconfig.json",
+    "compilerOptions": {
+        "outDir": "./gen/srv",
+        "rootDir": "."
+    },
+    "include": [
+        "srv/**/*"
+    ],
+    "exclude": [
+        "app",
+        "gen",
+        "node_modules",
+        "test"
+    ]
+}

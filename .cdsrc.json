@@ -1,0 +1,23 @@
+{
+    "odata": {
+        "body_parser_options": {
+            "limit": "50mb"
+        }
+    },
+    "server": {
+        "body": {
+            "limit": "50mb"
+        }
+    },
+    "watch": {
+        "exclude": [
+            "db.sqlite",
+            "db.sqlite-wal",
+            "db.sqlite-shm",
+            "**/*.log",
+            "**/*.pdf",
+            "_gen/",
+            "gen/"
+        ]
+    }
+}

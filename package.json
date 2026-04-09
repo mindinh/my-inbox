@@ -1,0 +1,140 @@
+{
+  "name": "cnma-vj-my-inbox",
+  "version": "1.0.0",
+  "description": "CNMA VJ My Inbox - Workflow task management and approvals",
+  "repository": "<repository>",
+  "license": "UNLICENSED",
+  "private": true,
+  "dependencies": {
+    "@cap-js/cds-typer": "^0",
+    "@sap-cloud-sdk/connectivity": "^4",
+    "@sap-cloud-sdk/http-client": "^4.4.0",
+    "@sap-cloud-sdk/resilience": "^4.4.0",
+    "@sap/cds": "^9.5.2",
+    "@sap/xssec": "^4",
+    "axios": "^1",
+    "dotenv": "^17.2.3",
+    "express": "^4",
+    "passport": "^0.7",
+    "uuid": "^13.0.0"
+  },
+  "scripts": {
+    "dev:all": "concurrently -k -n BE,FE -c cyan,green \"npm run dev:be\" \"npm run dev:fe\"",
+    "dev:hybrid": "concurrently -k -n BE,FE -c cyan,green \"npm run dev:be:hybrid\" \"npm run dev:fe\"",
+    "dev:be": "set PORT=4005&& cds serve --with-mocks",
+    "dev:be:hybrid": "set PORT=4005&& cds serve --profile hybrid --with-mocks",
+    "dev:fe": "npm --prefix app/cnma_vj_my_inbox_ui run dev",
+    "pp:token": "npm --prefix app/cnma_vj_my_inbox_ui run pp:token",
+    "start": "cds-serve",
+    "start:dev": "node -r ts-node/register node_modules/@sap/cds/bin/serve.js",
+    "build": "cds build --production",
+    "build:cf": "mbt build",
+    "clean": "npx --yes rimraf --glob gen/ mta_archives/ \"mta-op-*\" app/cnma_vj_my_inbox_ui/dist/",
+    "clean:all": "npm run clean && npx --yes rimraf node_modules/ app/cnma_vj_my_inbox_ui/node_modules/",
+    "predeploy": "npm run clean && mbt build",
+    "deploy": "cf deploy mta_archives/cnma-vj-my-inbox_1.0.0.mtar --retries 1",
+    "deploy:srv": "npm run clean && mbt build && cf deploy mta_archives/cnma-vj-my-inbox_1.0.0.mtar -m cnma-vj-my-inbox-srv",
+    "deploy:frontend": "npm run clean && mbt build && cf deploy mta_archives/cnma-vj-my-inbox_1.0.0.mtar -m cnma-vj-my-inbox-approuter -m cnma-vj-my-inbox-ui-deployer",
+    "start:hybrid": "set NODE_OPTIONS=--max-old-space-size=8192 && cds watch --profile hybrid",
+    "start:hybrid-qas": "set NODE_OPTIONS=--max-old-space-size=8192 && cds watch --profile hybrid-qas",
+    "test": "vitest run",
+    "build:types": "cds-typer srv --outputDirectory @cds-models",
+    "test:watch": "vitest",
+    "lint": "eslint srv/",
+    "lint:fix": "eslint srv/ --fix",
+    "cf:payg": "cf login -a https://api.cf.eu10.hana.ondemand.com",
+    "cf:cpea": "cf login -a https://api.cf.eu10-004.hana.ondemand.com",
+    "cf:dev": "cf target -o proconarum-development-system",
+    "cf:qas": "cf target -o proconarum-quality-system"
+  },
+  "cds": {
+    "build": {
+      "target": "gen",
+      "tasks": [
+        {
+          "for": "nodejs",
+          "src": "srv"
+        },
+        {
+          "for": "typescript",
+          "options": {
+            "tsconfig": "tsconfig.json"
+          }
+        }
+      ]
+    },
+    "requires": {
+      "auth": {
+        "kind": "mocked",
+        "users": {
+          "admin": {
+            "roles": [
+              "admin",
+              "user"
+            ]
+          },
+          "user": {
+            "roles": [
+              "user",
+              "admin"
+            ]
+          }
+        }
+      },
+      "[hybrid]": {
+        "auth": {
+          "kind": "mocked",
+          "users": {
+            "admin": {
+              "roles": [
+                "admin",
+                "user"
+              ]
+            }
+          }
+        }
+      },
+      "[hybrid-qas]": {
+        "auth": {
+          "kind": "mocked",
+          "users": {
+            "admin": {
+              "roles": [
+                "admin",
+                "user"
+              ]
+            }
+          }
+        }
+      },
+      "[production]": {
+        "auth": {
+          "kind": "xsuaa"
+        }
+      }
+    },
+    "server": {
+      "body": {
+        "limit": "50mb"
+      }
+    }
+  },
+  "devDependencies": {
+    "@cap-js/cds-types": "^0.15.0",
+    "@eslint/js": "^9.0.0",
+    "@types/express": "^5.0.6",
+    "@types/node": "^25.0.1",
+    "@types/passport": "^1.0.17",
+    "@types/uuid": "^10.0.0",
+    "concurrently": "^9.2.1",
+    "eslint": "^9.0.0",
+    "ts-node": "^10.9.2",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.0.0",
+    "vitest": "^4.0.17"
+  },
+  "engines": {
+    "node": "^20"
+  }
+}

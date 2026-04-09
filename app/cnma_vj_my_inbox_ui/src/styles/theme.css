@@ -1,0 +1,316 @@
+@custom-variant dark (&:is(.dark *));
+/* =================================================================
+   SIMPLIFIED THEME - Clean, Practical, Used Variables Only
+   ================================================================= */
+
+:root {
+   /* ─────────────────────────────────────────
+     TYPOGRAPHY (SAP UI5 Font Stack)
+     ───────────────────────────────────────── */
+   --font-sans: '72', -apple-system, BlinkMacSystemFont, "Segoe UI",
+      Roboto, "Helvetica Neue", Arial, sans-serif;
+   --font-mono: '72Mono', "72Monofull", "Lucida Console", monospace;
+   --font-weight-normal: 400;
+   --font-weight-medium: 500;
+   --font-semibold: 600;
+   --font-weight-bold: 700;
+
+   /* ─────────────────────────────────────────
+     BRAND COLORS (SAP UI5 Launchpad)
+     ───────────────────────────────────────── */
+   --color-brand: #b10e10;
+   --color-brand-hover: #990c0e;
+   --color-link: #820a0c;
+
+   /* ─────────────────────────────────────────
+     CORE PALETTE (Light Mode - SAP UI5)
+     ───────────────────────────────────────── */
+   --background: #f7f9fc;
+   --foreground: #32363a;
+   --card: #ffffff;
+   --card-foreground: #32363a;
+   --popover: #ffffff;
+   --popover-foreground: #32363a;
+   --primary: var(--color-brand);
+   --primary-hover: var(--color-brand-hover);
+   --primary-foreground: #ffffff;
+   --secondary: #eef3f8;
+   --secondary-foreground: #32363a;
+   --muted: #eef2f7;
+   --muted-foreground: #6a6d70;
+   --accent: #e8eff7;
+   --accent-foreground: #32363a;
+   --destructive: #aa0808;
+   --destructive-foreground: #ffffff;
+   --border: #d8e0ea;
+   --input: var(--input-border);
+   --input-background: #ffffff;
+   --input-border: #e2e8f0;
+   --input-border-hover: #990c0e;
+   --switch-background: #788fa6;
+   --ring: #000;
+   --radius: 0.5rem;
+
+   /* ─────────────────────────────────────────
+     BUTTON VARIANTS (SAP UI5)
+     ───────────────────────────────────────── */
+   --btn-create: var(--color-brand);
+   --btn-create-hover: var(--color-brand-hover);
+   --btn-create-foreground: #ffffff;
+   --btn-filter: #374151;
+   --btn-filter-hover: #1f2937;
+   --btn-filter-foreground: #ffffff;
+   --btn-action: #0070f2;
+   --btn-action-hover: #0064d9;
+   --btn-action-foreground: #ffffff;
+   --btn-success: #30914c;
+   --btn-success-hover: #1e592f;
+   --btn-success-foreground: #ffffff;
+
+   /* Accept Button (SAP) */
+   --btn-accept-border: #107e3e;
+   --btn-accept-bg: #ffffff;
+   --btn-accept-hover: #f1fdf6;
+   --btn-accept-active: #0d6733;
+
+   /* Reject Button (SAP) */
+   --btn-reject-border: #bb0000;
+   --btn-reject-bg: #ffffff;
+   --btn-reject-hover: #ffebeb;
+   --btn-reject-active: #a20000;
+
+   /* Attention Button (SAP) */
+   --btn-attention-border: #df6e0c;
+   --btn-attention-bg: #ffffff;
+   --btn-attention-hover: #fef7f1;
+   --btn-attention-active: #f3801c;
+
+   /* ─────────────────────────────────────────
+     STATUS COLORS (Semantic - SAP UI5)
+     ───────────────────────────────────────── */
+   --status-new-bg: #fff8d6;
+   --status-new-text: #b44f00;
+   --status-new-border: #f0b380;
+
+   --status-progress-bg: #ffedd5;
+   --status-progress-text: #e76500;
+   --status-progress-border: #f3b280;
+
+   --status-released-bg: #e1f4ff;
+   --status-released-text: #0070f2;
+   --status-released-border: #80b8f9;
+
+   --status-sent-bg: #f3e8ff;
+   --status-sent-text: #7800a4;
+   --status-sent-border: #d080e1;
+
+   --status-completed-bg: #f5fae5;
+   --status-completed-text: #256f3a;
+   --status-completed-border: #98c8a6;
+
+   --status-obsoleted-bg: #eff1f2;
+   --status-obsoleted-text: #32363a;
+   --status-obsoleted-border: #bcc7d3;
+
+   /* ─────────────────────────────────────────
+     SEMANTIC FEEDBACK COLORS (SAP UI5)
+     ───────────────────────────────────────── */
+   --success: #30914c;
+   --success-bg: #f5fae5;
+   --error: #e90b0b;
+   --error-bg: #ffeaf4;
+   --warning: #e76500;
+   --warning-bg: #fff8d6;
+   --info: #0070f2;
+   --info-bg: #e1f4ff;
+
+   /* ─────────────────────────────────────────
+     SIDEBAR (SAP Shell Navigation)
+     ───────────────────────────────────────── */
+   --sidebar: #f8fafc;
+   --sidebar-foreground: #32363a;
+   --sidebar-primary: var(--color-brand);
+   --sidebar-primary-foreground: #ffffff;
+   --sidebar-accent: #d8d8d8;
+   --sidebar-accent-foreground: #32363a;
+   --sidebar-border: #d9d9d9;
+   --sidebar-ring: #000;
+}
+
+@theme inline {
+   /* Font family */
+   --font-sans: '72', -apple-system, BlinkMacSystemFont, "Segoe UI",
+      Roboto, "Helvetica Neue", Arial, sans-serif;
+   --font-mono: '72Mono', "72Monofull", "Lucida Console", monospace;
+
+   /* Core */
+   --color-background: var(--background);
+   --color-foreground: var(--foreground);
+   --color-card: var(--card);
+   --color-card-foreground: var(--card-foreground);
+   --color-popover: var(--popover);
+   --color-popover-foreground: var(--popover-foreground);
+   --color-primary: var(--primary);
+   --color-primary-hover: var(--primary-hover);
+   --color-primary-foreground: var(--primary-foreground);
+   --color-secondary: var(--secondary);
+   --color-secondary-foreground: var(--secondary-foreground);
+   --color-muted: var(--muted);
+   --color-muted-foreground: var(--muted-foreground);
+   --color-accent: var(--accent);
+   --color-accent-foreground: var(--accent-foreground);
+   --color-destructive: var(--destructive);
+   --color-destructive-foreground: var(--destructive-foreground);
+   --color-border: var(--border);
+   --color-input: var(--input);
+   --color-input-background: var(--input-background);
+   --color-switch-background: var(--switch-background);
+   --color-ring: var(--ring);
+
+   /* Button variants */
+   --color-btn-create: var(--btn-create);
+   --color-btn-create-hover: var(--btn-create-hover);
+   --color-btn-create-foreground: var(--btn-create-foreground);
+   --color-btn-filter: var(--btn-filter);
+   --color-btn-filter-hover: var(--btn-filter-hover);
+   --color-btn-filter-foreground: var(--btn-filter-foreground);
+   --color-btn-action: var(--btn-action);
+   --color-btn-action-hover: var(--btn-action-hover);
+   --color-btn-action-foreground: var(--btn-action-foreground);
+   --color-btn-success: var(--btn-success);
+   --color-btn-success-hover: var(--btn-success-hover);
+   --color-btn-success-foreground: var(--btn-success-foreground);
+
+   /* Status colors */
+   --color-status-new: var(--status-new-bg);
+   --color-status-new-text: var(--status-new-text);
+   --color-status-new-border: var(--status-new-border);
+   --color-status-progress: var(--status-progress-bg);
+   --color-status-progress-text: var(--status-progress-text);
+   --color-status-progress-border: var(--status-progress-border);
+   --color-status-released: var(--status-released-bg);
+   --color-status-released-text: var(--status-released-text);
+   --color-status-released-border: var(--status-released-border);
+   --color-status-sent: var(--status-sent-bg);
+   --color-status-sent-text: var(--status-sent-text);
+   --color-status-sent-border: var(--status-sent-border);
+   --color-status-completed: var(--status-completed-bg);
+   --color-status-completed-text: var(--status-completed-text);
+   --color-status-completed-border: var(--status-completed-border);
+   --color-status-obsoleted: var(--status-obsoleted-bg);
+   --color-status-obsoleted-text: var(--status-obsoleted-text);
+   --color-status-obsoleted-border: var(--status-obsoleted-border);
+
+   /* Semantic feedback */
+   --color-success: var(--success);
+   --color-success-bg: var(--success-bg);
+   --color-error: var(--error);
+   --color-error-bg: var(--error-bg);
+   --color-warning: var(--warning);
+   --color-warning-bg: var(--warning-bg);
+   --color-info: var(--info);
+   --color-info-bg: var(--info-bg);
+
+   /* Radius */
+   --radius-sm: calc(var(--radius) - 4px);
+   --radius-md: calc(var(--radius) - 2px);
+   --radius-lg: var(--radius);
+   --radius-xl: calc(var(--radius) + 4px);
+
+   /* Sidebar */
+   --color-sidebar: var(--sidebar);
+   --color-sidebar-foreground: var(--sidebar-foreground);
+   --color-sidebar-primary: var(--sidebar-primary);
+   --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+   --color-sidebar-accent: var(--sidebar-accent);
+   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+   --color-sidebar-border: var(--sidebar-border);
+   --color-sidebar-ring: var(--sidebar-ring);
+}
+
+/* ─────────────────────────────────────────
+   BASE LAYER STYLES
+   ───────────────────────────────────────── */
+@layer base {
+   * {
+      @apply border-border outline-ring/50;
+   }
+
+   body {
+      @apply bg-background text-foreground;
+      font-family: var(--font-sans);
+      font-weight: 400;
+      line-height: 1.5;
+      min-height: 100vh;
+   }
+
+   h1,
+   h2,
+   h3,
+   h4,
+   h5,
+   h6 {
+      font-family: var(--font-sans);
+      font-weight: 600;
+   }
+
+   button,
+   input,
+   select,
+   textarea {
+      font-family: var(--font-sans);
+   }
+
+   code,
+   pre {
+      font-family: var(--font-mono);
+   }
+
+   /* Custom Scrollbar Styles */
+   ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+   }
+
+   ::-webkit-scrollbar-track {
+      background: transparent;
+   }
+
+   ::-webkit-scrollbar-thumb {
+      background-color: #9ca3af;
+      border-radius: 4px;
+      border: 2px solid transparent;
+      background-clip: content-box;
+   }
+
+   ::-webkit-scrollbar-thumb:hover {
+      background-color: #6b7280;
+   }
+
+   * {
+      scrollbar-width: thin;
+      scrollbar-color: #9ca3af transparent;
+   }
+}
+
+/* Utility: Hide native scrollbar */
+.scrollbar-hidden,
+.no-scrollbar {
+   scrollbar-width: none;
+}
+
+.scrollbar-hidden::-webkit-scrollbar,
+.no-scrollbar::-webkit-scrollbar {
+   display: none;
+}
+
+/* Custom Animations */
+@keyframes shimmer {
+   0% {
+      background-position: 200% center;
+   }
+
+   100% {
+      background-position: -200% center;
+   }
+}

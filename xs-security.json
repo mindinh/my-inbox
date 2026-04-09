@@ -1,0 +1,65 @@
+{
+    "xsappname": "cnma-vj-my-inbox",
+    "tenant-mode": "dedicated",
+    "scopes": [
+        {
+            "name": "$XSAPPNAME.admin",
+            "description": "Administrator - Full access to all features"
+        },
+        {
+            "name": "$XSAPPNAME.user",
+            "description": "User - Access to inbox task management"
+        }
+    ],
+    "role-templates": [
+        {
+            "name": "Admin",
+            "description": "Administrator role with full access",
+            "scope-references": [
+                "$XSAPPNAME.admin",
+                "$XSAPPNAME.user"
+            ]
+        },
+        {
+            "name": "User",
+            "description": "Regular user role for task processing",
+            "scope-references": [
+                "$XSAPPNAME.user"
+            ]
+        }
+    ],
+    "role-collections": [
+        {
+            "name": "CNMA-VJ-INBOX-Admin",
+            "description": "Administrators with full access to My Inbox",
+            "role-template-references": [
+                "$XSAPPNAME.Admin"
+            ]
+        },
+        {
+            "name": "CNMA-VJ-INBOX-User",
+            "description": "Users who can view and process inbox tasks",
+            "role-template-references": [
+                "$XSAPPNAME.User"
+            ]
+        }
+    ],
+    "oauth2-configuration": {
+        "token-validity": 43200,
+        "credential-types": [
+            "binding-secret",
+            "x509"
+        ],
+        "grant-types": [
+            "authorization_code",
+            "client_credentials",
+            "user_token",
+            "urn:ietf:params:oauth:grant-type:jwt-bearer"
+        ],
+        "redirect-uris": [
+            "https://*.cfapps.*.hana.ondemand.com/**",
+            "https://*.dt.hana.ondemand.com/**",
+            "https://*.launchpad.cfapps.*.hana.ondemand.com/**"
+        ]
+    }
+}
