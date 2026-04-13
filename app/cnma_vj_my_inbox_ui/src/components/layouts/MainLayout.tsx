@@ -40,7 +40,7 @@ type NavEntry = NavLeaf | NavGroup;
 function useNavTree(): NavEntry[] {
   const { t } = useTranslation();
   return [
-    { type: 'leaf', to: '/', icon: Inbox, label: t('nav.inbox', 'My Inbox') },
+    { type: 'leaf', to: '/', icon: Inbox, label: t('nav.inbox', 'prorequest') },
     // TODO: Add more navigation items here
   ];
 }
@@ -187,7 +187,7 @@ export function MainLayout() {
             {!isCollapsed && (
               <div className="flex items-center gap-2 overflow-hidden">
                 <img src="./RESOURCE_FAVICON.png" alt="Logo" className="w-6 h-6 shrink-0 rounded-sm" />
-                <span className="text-sm font-bold tracking-wide text-sidebar-foreground">{t('app.title', 'My Inbox')}</span>
+                <span className="text-sm font-bold tracking-wide text-sidebar-foreground">{t('app.title', 'prorequest')}</span>
               </div>
             )}
 
@@ -265,7 +265,7 @@ export function MainLayout() {
           </Button>
           <div className="flex items-center gap-2 flex-1">
             <img src="./RESOURCE_FAVICON.png" alt="Logo" className="w-6 h-6 shrink-0 rounded-sm" />
-            <h1 className="text-[17px] font-bold text-slate-800 tracking-tight">{t('app.title', 'My Inbox')}</h1>
+            <h1 className="text-[17px] font-bold text-slate-800 tracking-tight">{t('app.title', 'prorequest')}</h1>
           </div>
         </div>
 

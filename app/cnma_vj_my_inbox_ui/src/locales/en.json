@@ -1,7 +1,7 @@
 {
     "app": {
         "name": "Approval App",
-        "title": "My Inbox"
+        "title": "prorequest"
     },
     "common": {
         "actions": "Actions",
@@ -41,7 +41,7 @@
     },
     "nav": {
         "dashboard": "Dashboard",
-        "myInbox": "My Inbox",
+        "myInbox": "prorequest",
         "substitutionInbox": "Substitution Inbox"
     },
     "dashboard": {
@@ -84,7 +84,7 @@
         "itemsCount": "{{count}} items"
     },
     "inbox": {
-        "title": "My Inbox",
+        "title": "prorequest",
         "tasks": "Tasks",
         "noTasks": "No tasks available",
         "pending": "Pending",
