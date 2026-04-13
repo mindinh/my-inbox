@@ -1,8 +1,22 @@
 import express, { Router, Request, Response, NextFunction } from 'express';
-import { resolveIdentity, assertSapUser } from './identity-resolver';
+import { resolveIdentity } from './resolvers/identity-resolver';
 import { getInboxService } from './inbox-service';
-import { DecisionError } from './decision-handler';
+import { DecisionError } from './handlers/decision-handler';
 import { DecisionRequest, ForwardRequest, InboxIdentity } from '../types';
+import { resolveAuthRuntimeConfig } from '../core/config/auth-mode';
+import { buildAppRequestContext, AppRequestContext } from '../core/context/app-request-context';
+import {
+    buildSAPExecutionContext,
+    SAPExecutionContext,
+} from '../core/context/sap-execution-context';
+import { logRequestContextBuilt, logRequestReceived } from '../core/logging/request-log';
+import { logSapExecutionContextBuilt } from '../core/logging/sap-call-log';
+import {
+    assertSapUserForExecutionContext,
+    resolveIdentityFromContexts,
+} from './helpers/request-context-identity';
+
+const authRuntimeConfig = resolveAuthRuntimeConfig();
 
 /**
  * Inbox Router — REST API endpoints
@@ -11,8 +25,6 @@ import { DecisionRequest, ForwardRequest, InboxIdentity } from '../types';
  *   GET  /tasks          — List all tasks
  *   GET  /tasks/:id      — Task detail
  *   POST /tasks/:id/decision — Execute decision
- *   POST /tasks/:id/claim    — Claim task
- *   POST /tasks/:id/release  — Release task
  *   POST /tasks/:id/forward  — Forward task
  *
  * Each endpoint:
@@ -70,51 +82,82 @@ export function createInboxRouter(): Router {
         });
     }));
 
+    // ─── GET /dashboard ───────────────────────────────────────
+    router.get('/dashboard', asyncHandler(async (req: Request, res: Response) => {
+        const { identity, appContext, sapContext } = buildInboxRequestContext(req, 'getDashboard');
+        const service = getInboxService();
+        const result = await service.getDashboard(identity, { appContext, sapContext });
+        res.json(result);
+    }));
+
     // ─── GET /tasks ───────────────────────────────────────
     router.get('/tasks', asyncHandler(async (req: Request, res: Response) => {
-        const identity = resolveAndValidateIdentity(req);
+        const { identity, appContext, sapContext } = buildInboxRequestContext(req, 'getTasks');
         const service = getInboxService();
         const top = req.query.top ? parseInt(req.query.top as string, 10) : undefined;
         const skip = req.query.skip ? parseInt(req.query.skip as string, 10) : undefined;
-        const result = await service.getTasks(identity, { top, skip });
+        const result = await service.getTasks(identity, { top, skip }, { appContext, sapContext });
         res.json(result);
     }));
 
     // ─── GET /tasks/approved ──────────────────────────────
     router.get('/tasks/approved', asyncHandler(async (req: Request, res: Response) => {
-        const identity = resolveAndValidateIdentity(req);
+        const { identity, appContext, sapContext } = buildInboxRequestContext(req, 'getApprovedTasks');
         const service = getInboxService();
         const top = req.query.top ? parseInt(req.query.top as string, 10) : undefined;
         const skip = req.query.skip ? parseInt(req.query.skip as string, 10) : undefined;
-        const result = await service.getApprovedTasks(identity, { top, skip });
+        const result = await service.getApprovedTasks(identity, { top, skip }, { appContext, sapContext });
         res.json(result);
     }));
 
     // ─── GET /tasks/:id ───────────────────────────────────
-    router.get('/tasks/:id', asyncHandler(async (req: Request, res: Response) => {
-        const identity = resolveAndValidateIdentity(req);
+    router.get('/tasks/:id/information', asyncHandler(async (req: Request, res: Response) => {
+        const { identity, appContext, sapContext } = buildInboxRequestContext(req, 'getTaskInformation');
         const service = getInboxService();
         const id = req.params.id as string;
 
-        const result = await service.getTaskDetail(identity, id);
+        // Accept optional client hints to skip redundant SAP lookups
+        const clientHints = {
+            sapOrigin: req.query.sapOrigin as string | undefined,
+            documentId: req.query.documentId as string | undefined,
+            businessObjectType: req.query.businessObjectType as string | undefined,
+        };
+        const hasHints = clientHints.sapOrigin || clientHints.documentId;
+
+        const result = await service.getTaskInformation(
+            identity, id, { appContext, sapContext },
+            hasHints ? clientHints : undefined
+        );
+        res.json(result);
+    }));
+
+    router.get('/tasks/:id', asyncHandler(async (req: Request, res: Response) => {
+        const { identity, appContext, sapContext } = buildInboxRequestContext(req, 'getTaskDetail');
+        const service = getInboxService();
+        const id = req.params.id as string;
+
+        const result = await service.getTaskDetail(identity, id, { appContext, sapContext });
         res.json(result);
     }));
 
     // ─── GET /tasks/:id/workflow-approval-tree ────────
     router.get('/tasks/:id/workflow-approval-tree', asyncHandler(async (req: Request, res: Response) => {
-        const identity = resolveAndValidateIdentity(req);
+        const { identity, appContext, sapContext } = buildInboxRequestContext(req, 'getPurchaseRequisitionApprovalTree');
         const service = getInboxService();
         const id = req.params.id as string;
         const documentId = req.query.documentId as string | undefined;
         const sapOrigin = req.query.sapOrigin as string | undefined;
 
-        const result = await service.getPurchaseRequisitionApprovalTree(identity, id, documentId, sapOrigin);
+        const result = await service.getPurchaseRequisitionApprovalTree(identity, id, documentId, sapOrigin, {
+            appContext,
+            sapContext,
+        });
         res.json(result);
     }));
 
     // ─── POST /tasks/:id/decision ─────────────────────────
     router.post('/tasks/:id/decision', asyncHandler(async (req: Request, res: Response) => {
-        const identity = resolveAndValidateIdentity(req);
+        const { identity, appContext, sapContext } = buildInboxRequestContext(req, 'executeDecision');
         const service = getInboxService();
         const id = req.params.id as string;
 
@@ -126,27 +169,7 @@ export function createInboxRouter(): Router {
             _context: req.body._context,
         };
 
-        const result = await service.executeDecision(identity, id, request);
-        res.json(result);
-    }));
-
-    // ─── POST /tasks/:id/claim ────────────────────────────
-    router.post('/tasks/:id/claim', asyncHandler(async (req: Request, res: Response) => {
-        const identity = resolveAndValidateIdentity(req);
-        const service = getInboxService();
-        const id = req.params.id as string;
-
-        const result = await service.claimTask(identity, id);
-        res.json(result);
-    }));
-
-    // ─── POST /tasks/:id/release ──────────────────────────
-    router.post('/tasks/:id/release', asyncHandler(async (req: Request, res: Response) => {
-        const identity = resolveAndValidateIdentity(req);
-        const service = getInboxService();
-        const id = req.params.id as string;
-
-        const result = await service.releaseTask(identity, id);
+        const result = await service.executeDecision(identity, id, request, { appContext, sapContext });
         res.json(result);
     }));
 
@@ -243,21 +266,55 @@ export function createInboxRouter(): Router {
 
 type AsyncRequestHandler = (req: Request, res: Response, next: NextFunction) => Promise<void>;
 
+interface InboxRequestContext {
+    appContext: AppRequestContext;
+    sapContext: SAPExecutionContext;
+    identity: InboxIdentity;
+}
+
+type ContextAwareRequest = Request & { inboxContext?: InboxRequestContext };
+
 function asyncHandler(fn: AsyncRequestHandler) {
     return (req: Request, res: Response, next: NextFunction) => {
         fn(req, res, next).catch(next);
     };
 }
 
-function resolveAndValidateIdentity(req: Request): InboxIdentity {
-    const identity = resolveIdentity(req);
-    assertSapUser(identity);
-    return identity;
+function buildInboxRequestContext(req: Request, operationName: string): InboxRequestContext {
+    const appContext = buildAppRequestContext(req, operationName);
+    logRequestReceived(req, appContext);
+    logRequestContextBuilt(appContext);
+
+    const sapContext = buildSAPExecutionContext(appContext, authRuntimeConfig);
+    logSapExecutionContextBuilt(appContext, sapContext);
+    assertSapUserForExecutionContext(sapContext);
+
+    const identity = resolveIdentityFromContexts(appContext, sapContext);
+    (req as ContextAwareRequest).inboxContext = { appContext, sapContext, identity };
+    return { appContext, sapContext, identity };
+}
+
+function resolveAndValidateIdentity(req: Request, operationName = 'legacy.route'): InboxIdentity {
+    return buildInboxRequestContext(req, operationName).identity;
 }
 
 // ─── Error Handler ────────────────────────────────────────
 
 function inboxErrorHandler(err: Error, req: Request, res: Response, _next: NextFunction): void {
+    const requestContext = (req as ContextAwareRequest).inboxContext?.appContext;
+    if (requestContext) {
+        console.error(
+            JSON.stringify({
+                event: 'request.error',
+                requestId: requestContext.requestId,
+                operationName: requestContext.operationName,
+                method: requestContext.method,
+                path: requestContext.path,
+                message: err.message,
+            })
+        );
+    }
+
     console.error('[InboxRouter] Error:', err.message);
     const causeMessage = extractCauseMessage(err);
     if (causeMessage) {

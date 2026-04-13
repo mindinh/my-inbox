@@ -11,7 +11,9 @@
         "lint": "eslint .",
         "preview": "vite preview",
         "zip": "cd dist && npx bestzip ../cnma_vj_my_inbox_ui.zip * && npx -y shx mv ../cnma_vj_my_inbox_ui.zip .",
-        "pp:token": "node pp-token.mjs"
+        "pp:token": "node pp-token.mjs",
+        "test": "vitest run",
+        "test:watch": "vitest"
     },
     "dependencies": {
         "@cyntler/react-doc-viewer": "^1.17.1",
@@ -73,7 +75,8 @@
         "tailwindcss": "4.1.12",
         "typescript": "~5.9.3",
         "typescript-eslint": "^8.46.4",
-        "vite": "^7.2.4"
+        "vite": "^7.2.4",
+        "vitest": "^4.1.4"
     },
     "proxy": "http://localhost:5000"
 }

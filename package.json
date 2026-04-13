@@ -48,6 +48,9 @@
     "cf:qas": "cf target -o proconarum-quality-system"
   },
   "cds": {
+    "odata": {
+      "max_batch_parallelization": 8
+    },
     "build": {
       "target": "gen",
       "tasks": [

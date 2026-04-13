@@ -186,7 +186,7 @@ export function MainLayout() {
           <div className={cn("p-4 flex items-center", isCollapsed ? "justify-center" : "justify-between")}>
             {!isCollapsed && (
               <div className="flex items-center gap-2 overflow-hidden">
-                <img src="/RESOURCE_FAVICON.png" alt="Logo" className="w-6 h-6 shrink-0 rounded-sm" />
+                <img src="./RESOURCE_FAVICON.png" alt="Logo" className="w-6 h-6 shrink-0 rounded-sm" />
                 <span className="text-sm font-bold tracking-wide text-sidebar-foreground">{t('app.title', 'My Inbox')}</span>
               </div>
             )}
@@ -264,7 +264,7 @@ export function MainLayout() {
             <Menu size={22} strokeWidth={2.5} />
           </Button>
           <div className="flex items-center gap-2 flex-1">
-            <img src="/RESOURCE_FAVICON.png" alt="Logo" className="w-6 h-6 shrink-0 rounded-sm" />
+            <img src="./RESOURCE_FAVICON.png" alt="Logo" className="w-6 h-6 shrink-0 rounded-sm" />
             <h1 className="text-[17px] font-bold text-slate-800 tracking-tight">{t('app.title', 'My Inbox')}</h1>
           </div>
         </div>

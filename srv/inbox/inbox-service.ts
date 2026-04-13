@@ -5,54 +5,105 @@ import {
     TaskActionResponse,
     DecisionRequest,
     InboxTask,
-    TaskDetail,
     PurchaseRequisitionApprovalTreeResponse,
+    DashboardResponse,
 } from '../types';
-import { ISapTaskClient, SapTaskClient } from './sap-task-client';
-import { MockSapTaskClient } from './mock/mock-sap-client';
 import {
-    normalizeTask,
-    normalizeTasks,
-    normalizeDecisions,
-    normalizeDescription,
-    normalizeCustomAttributes,
-    normalizeTaskObjects,
-    normalizeComments,
-    normalizeProcessingLogs,
-    normalizeWorkflowLogs,
-    normalizeAttachments,
-} from './task-adapter';
-import { resolveBusinessContext } from './business-context-resolver';
-import { enrichBusinessObjectData } from './business-object-data-resolver';
-import { DecisionHandler, DecisionError } from './decision-handler';
-import { SapPurchaseRequisitionApprovalTreeClient } from './sap-pr-approval-tree-client';
+    assembleTaskListResponse,
+    assembleFullDetailResponse,
+    assembleInformationResponse,
+    assembleActionResponse,
+} from './handlers/task-response-assembler';
+import { ISapTaskClient, SapTaskClient } from './clients/sap-task-client';
+import { MockSapTaskClient } from './mock/mock-sap-client';
+import { resolveBusinessContext } from './resolvers/business-context-resolver';
+import { enrichBusinessObjectData } from './resolvers/business-object-data-resolver';
+import { DecisionError } from './handlers/decision-handler';
+import { SapPurchaseRequisitionApprovalTreeClient } from './clients/sap-pr-approval-tree-client';
+import { SapDashboardClient } from './clients/sap-dashboard-client';
 import { MOCK_PR_APPROVAL_TREES, MOCK_PR_APPROVAL_COMMENTS } from './mock/mock-factsheet-data';
+import { MOCK_DASHBOARD_TASKS } from './mock/mock-dashboard-data';
+import { resolveAuthRuntimeConfig } from '../core/config/auth-mode';
+import { AppRequestContext } from '../core/context/app-request-context';
+import { SAPExecutionContext } from '../core/context/sap-execution-context';
+import {
+    logSapReadFinished,
+    logSapReadStarted,
+} from '../core/logging/sap-call-log';
+import {
+    executeTaskDecisionBoundary,
+    inferDecisionKind,
+} from '../integrations/sap/task-decision-boundary';
+
+// Phase 2: Modular adapters replace direct sapClient usage
+import { TaskQueryAdapter } from '../integrations/sap/task-query-adapter';
+import { TaskDetailAdapter } from '../integrations/sap/task-detail-adapter';
+import { TaskDecisionAdapter } from '../integrations/sap/task-decision-adapter';
+import type { AdapterContext } from '../integrations/sap/task-transport-utils';
 
 /**
  * Inbox Service — The Orchestrator
  *
  * Core BFF layer that:
  *   1. Receives identity-resolved requests from the router
- *   2. Calls SAP TASKPROCESSING via sap-task-client
- *   3. Normalizes SAP data into clean domain models
- *   4. Resolves business context (PR/PO detection)
+ *   2. Delegates SAP TASKPROCESSING calls to capability-specific adapters
+ *   3. Resolves business context (PR/PO detection)
+ *   4. Enriches domain models with factsheet data
  *   5. Validates and executes decisions
+ *
+ * Phase 2: SAP transport concerns are fully delegated to adapters.
+ *   - TaskQueryAdapter  → task list retrieval
+ *   - TaskDetailAdapter → task detail / information / attachment streaming
+ *   - TaskDecisionAdapter → approve / reject / forward / comment / attachment upload
  *
  * This is the ONLY class the router talks to. All SAP complexity is hidden here.
  */
 
+export interface ServiceExecutionContext {
+    appContext: AppRequestContext;
+    sapContext: SAPExecutionContext;
+}
+
 export class InboxService {
-    private sapClient: ISapTaskClient;
-    private decisionHandler: DecisionHandler;
+    private queryAdapter: TaskQueryAdapter;
+    private detailAdapter: TaskDetailAdapter;
+    private decisionAdapter: TaskDecisionAdapter;
+    private dashboardClient: SapDashboardClient;
     private prApprovalTreeClient: SapPurchaseRequisitionApprovalTreeClient;
 
     constructor() {
-        this.sapClient = createSapClient();
-        this.decisionHandler = new DecisionHandler(this.sapClient);
+        const sapClient = createSapClient();
+        this.queryAdapter = new TaskQueryAdapter(sapClient);
+        this.detailAdapter = new TaskDetailAdapter(sapClient);
+        this.decisionAdapter = new TaskDecisionAdapter(sapClient);
         this.prApprovalTreeClient = new SapPurchaseRequisitionApprovalTreeClient();
+        this.dashboardClient = new SapDashboardClient();
         console.log(
             `[InboxService] Initialized with ${this.isMockMode() ? 'MOCK' : 'REAL'} SAP client`
         );
+    }
+
+    // ─── Dashboard ────────────────────────────────────────
+
+    /**
+     * Get dashboard data for the authenticated user.
+     * Returns all task-level records from the ZI_PR_DASH_BOARD entity.
+     */
+    async getDashboard(
+        identity: InboxIdentity,
+        executionContext?: ServiceExecutionContext
+    ): Promise<DashboardResponse> {
+        if (this.isMockMode()) {
+            return { items: MOCK_DASHBOARD_TASKS, total: MOCK_DASHBOARD_TASKS.length };
+        }
+
+        const result = await this.withSapReadLogging(
+            executionContext,
+            'fetchDashboard',
+            () => this.dashboardClient.fetchDashboard({ userJwt: identity.userJwt })
+        );
+
+        return { items: result.items, total: result.total };
     }
 
     // ─── Read Operations ──────────────────────────────────
@@ -61,123 +112,163 @@ export class InboxService {
      * Get all tasks for the given identity.
      * Returns normalized task list with business context enrichment (factsheet header data).
      */
-    async getTasks(identity: InboxIdentity, pagination?: { top?: number; skip?: number }): Promise<TaskListResponse> {
-        const { results: rawTasks, totalCount } = await this.sapClient.fetchTasks(identity.sapUser, identity.userJwt, pagination);
-        const tasks = normalizeTasks(rawTasks);
+    async getTasks(
+        identity: InboxIdentity,
+        pagination?: { top?: number; skip?: number },
+        executionContext?: ServiceExecutionContext
+    ): Promise<TaskListResponse> {
+        const adapterCtx = toAdapterContext(identity);
 
-        // Resolve business context from title parsing, then enrich with factsheet data
-        // Use includeItemDetails:false to skip heavy approval tree + description fetches
-        await Promise.all(tasks.map(async (task) => {
-            const baseContext = resolveBusinessContext(task, [], []);
-            const enrichedContext = await enrichBusinessObjectData(identity, baseContext, {
-                sapOrigin: task.sapOrigin,
-                includeItemDetails: false,
-            });
-            task.businessContext = enrichedContext;
-            task.requestorName = extractRequestorName(enrichedContext) || task.requestorName;
-        }));
+        const { items: tasks, total } = await this.withSapReadLogging(
+            executionContext,
+            'fetchTasks',
+            () => this.queryAdapter.fetchTasks(adapterCtx, pagination)
+        );
 
-        return {
-            identity,
-            items: tasks,
-            total: totalCount,
-        };
+        await Promise.all(
+            tasks.map((task) => this.enrichTaskForList(identity, task))
+        );
+
+        return assembleTaskListResponse(identity, tasks, total);
     }
 
     /**
      * Get all approved tasks for the given identity.
      * Returns normalized task list with business context enrichment (factsheet header data).
      */
-    async getApprovedTasks(identity: InboxIdentity, pagination?: { top?: number; skip?: number }): Promise<TaskListResponse> {
-        const { results: rawTasks, totalCount } = await this.sapClient.fetchApprovedTasks(identity.sapUser, identity.userJwt, pagination);
-        const tasks = normalizeTasks(rawTasks);
+    async getApprovedTasks(
+        identity: InboxIdentity,
+        pagination?: { top?: number; skip?: number },
+        executionContext?: ServiceExecutionContext
+    ): Promise<TaskListResponse> {
+        const adapterCtx = toAdapterContext(identity);
 
-        // Resolve business context from title parsing, then enrich with factsheet data
-        await Promise.all(tasks.map(async (task) => {
-            const baseContext = resolveBusinessContext(task, [], []);
-            const enrichedContext = await enrichBusinessObjectData(identity, baseContext, {
-                sapOrigin: task.sapOrigin,
-                includeItemDetails: false,
-            });
-            task.businessContext = enrichedContext;
-            task.requestorName = extractRequestorName(enrichedContext) || task.requestorName;
-        }));
+        const { items: tasks, total } = await this.withSapReadLogging(
+            executionContext,
+            'fetchApprovedTasks',
+            () => this.queryAdapter.fetchApprovedTasks(adapterCtx, pagination)
+        );
 
-        return {
-            identity,
-            items: tasks,
-            total: totalCount,
-        };
+        await Promise.all(
+            tasks.map((task) => this.enrichTaskForList(identity, task))
+        );
+
+        return assembleTaskListResponse(identity, tasks, total);
     }
 
     /**
      * Get full task detail with all navigation properties resolved.
-     * Uses SAP $batch orchestration in the client to avoid unstable direct sub-requests.
+     * Uses SAP $batch orchestration in the detail adapter to avoid unstable direct sub-requests.
      */
-    async getTaskDetail(identity: InboxIdentity, instanceId: string): Promise<TaskDetailResponse> {
-        const rawTask = await this.sapClient.fetchTaskDetailBundle(
-            identity.sapUser,
-            instanceId,
-            identity.userJwt
-        );
-        const attrDefinitionsFromExpand =
-            rawTask.TaskDefinitionData?.CustomAttributeDefinitionData?.results || [];
-        const attrDefinitions =
-            attrDefinitionsFromExpand.length > 0
-                ? attrDefinitionsFromExpand
-                : rawTask.TaskDefinitionID
-                    ? await this.sapClient
-                        .fetchCustomAttributeDefinitions(
-                            identity.sapUser,
-                            rawTask.TaskDefinitionID,
-                            identity.userJwt
-                        )
-                        .catch(() => [])
-                    : [];
+    async getTaskDetail(
+        identity: InboxIdentity,
+        instanceId: string,
+        executionContext?: ServiceExecutionContext
+    ): Promise<TaskDetailResponse> {
+        const adapterCtx = toAdapterContext(identity);
 
-        // Normalize all responses
-        const task: InboxTask = normalizeTask(rawTask);
-        const decisions = normalizeDecisions(rawTask.DecisionOptions?.results || []);
-        const description = normalizeDescription(rawTask.Description || null);
-        const customAttributes = normalizeCustomAttributes(
-            rawTask.CustomAttributeData?.results || [],
-            attrDefinitions
+        const bundle = await this.withSapReadLogging(
+            executionContext,
+            'fetchTaskDetailBundle',
+            () => this.detailAdapter.fetchTaskDetailBundle(adapterCtx, instanceId)
         );
-        const taskObjects = normalizeTaskObjects(rawTask.TaskObjects?.results || []);
-        const comments = normalizeComments(rawTask.Comments?.results || []);
-        const processingLogs = normalizeProcessingLogs(rawTask.ProcessingLogs?.results || []);
-        const workflowLogs = normalizeWorkflowLogs(rawTask.WorkflowLogs?.results || []);
-        const attachments = normalizeAttachments(rawTask.Attachments?.results || []);
 
         // Full business context resolution using all available data
-        const resolvedContext = resolveBusinessContext(task, customAttributes, taskObjects);
+        const resolvedContext = resolveBusinessContext(
+            bundle.task,
+            bundle.customAttributes,
+            bundle.taskObjects
+        );
         const businessContext = await enrichBusinessObjectData(identity, resolvedContext, {
-            sapOrigin: rawTask.SAP__Origin,
+            sapOrigin: bundle.sapIdentifiers.sapOrigin,
+            includeItemDetails: true,
+            includePrInfo: true,
+            includeApprovalTree: false,
         });
-        task.businessContext = businessContext;
-        task.requestorName = extractRequestorName(businessContext) || task.requestorName;
+        bundle.task.businessContext = businessContext;
+        bundle.task.requestorName = extractRequestorName(businessContext) || bundle.task.requestorName;
 
-        const detail: TaskDetail = {
-            task,
-            description,
-            decisions,
-            customAttributes,
-            taskObjects,
-            comments,
-            processingLogs,
-            workflowLogs,
-            attachments,
-            businessContext,
-        };
+        return assembleFullDetailResponse(identity, bundle, businessContext);
+    }
 
-        return { identity, detail };
+    /**
+     * Get lightweight task information for fast first render in detail pane.
+     * Excludes heavy tab payloads (comments, attachments, logs).
+     *
+     * When the frontend forwards client hints (sapOrigin, documentId),
+     * the adapter skips the origin-lookup fetch and the service runs
+     * PR / PO enrichment in parallel with the SAP $batch call — cutting
+     * total latency roughly in half.
+     */
+    async getTaskInformation(
+        identity: InboxIdentity,
+        instanceId: string,
+        executionContext?: ServiceExecutionContext,
+        clientHints?: { sapOrigin?: string; documentId?: string; businessObjectType?: string }
+    ): Promise<TaskDetailResponse> {
+        const adapterCtx = toAdapterContext(identity);
+
+        // When the caller already knows the document ID (e.g. PR number),
+        // we can start enrichment immediately — in parallel with the SAP
+        // $batch fetch — instead of waiting for the $batch result first.
+        const earlyEnrichPromise =
+            clientHints?.documentId && clientHints?.businessObjectType
+                ? enrichBusinessObjectData(
+                      identity,
+                      {
+                          type: clientHints.businessObjectType as 'PR' | 'PO',
+                          documentId: clientHints.documentId,
+                      },
+                      {
+                          sapOrigin: clientHints.sapOrigin,
+                          includeItemDetails: false,
+                          includePrInfo: true,
+                          includeApprovalTree: false,
+                      }
+                  ).catch(() => undefined)
+                : Promise.resolve(undefined);
+
+        const [bundle, earlyEnriched] = await Promise.all([
+            this.withSapReadLogging(
+                executionContext,
+                'fetchTaskInformation',
+                () => this.detailAdapter.fetchTaskInformation(adapterCtx, instanceId, clientHints)
+            ),
+            earlyEnrichPromise,
+        ]);
+
+        // If early enrichment was available, merge it. Otherwise fall back to
+        // the sequential path as before.
+        let businessContext;
+        if (earlyEnriched && earlyEnriched.documentId) {
+            businessContext = earlyEnriched;
+        } else {
+            const resolvedContext = resolveBusinessContext(
+                bundle.task,
+                bundle.customAttributes,
+                bundle.taskObjects
+            );
+            businessContext = await enrichBusinessObjectData(identity, resolvedContext, {
+                sapOrigin: bundle.sapIdentifiers.sapOrigin,
+                includeItemDetails: false,
+                includePrInfo: true,
+                includeApprovalTree: false,
+            });
+        }
+
+        bundle.task.businessContext = businessContext;
+        bundle.task.requestorName =
+            extractRequestorName(businessContext) || bundle.task.requestorName || bundle.task.createdByName;
+
+        return assembleInformationResponse(identity, bundle, businessContext);
     }
 
     async getPurchaseRequisitionApprovalTree(
         identity: InboxIdentity,
         instanceId: string,
         queryDocumentId?: string,
-        querySapOrigin?: string
+        querySapOrigin?: string,
+        executionContext?: ServiceExecutionContext
     ): Promise<PurchaseRequisitionApprovalTreeResponse> {
         let prNumber = queryDocumentId;
         let origin = querySapOrigin;
@@ -185,20 +276,24 @@ export class InboxService {
         // If the frontend does not provide the PR number, we fall back to a heavy fetch
         // to parse the PR number.
         if (!prNumber) {
-            const rawTask = await this.sapClient.fetchTaskDetailBundle(
-                identity.sapUser,
-                instanceId,
-                identity.userJwt
+            const adapterCtx = toAdapterContext(identity);
+
+            const bundle = await this.withSapReadLogging(
+                executionContext,
+                'fetchTaskDetailBundle',
+                () => this.detailAdapter.fetchTaskDetailBundle(adapterCtx, instanceId)
             );
 
-            const task: InboxTask = normalizeTask(rawTask);
-            const customAttributes = normalizeCustomAttributes(rawTask.CustomAttributeData?.results || []);
-            const taskObjects = normalizeTaskObjects(rawTask.TaskObjects?.results || []);
-
-            const resolvedContext = resolveBusinessContext(task, customAttributes, taskObjects);
+            const resolvedContext = resolveBusinessContext(
+                bundle.task,
+                bundle.customAttributes,
+                bundle.taskObjects
+            );
             const enrichedContext = await enrichBusinessObjectData(identity, resolvedContext, {
-                sapOrigin: rawTask.SAP__Origin,
+                sapOrigin: bundle.sapIdentifiers.sapOrigin,
                 includeItemDetails: false,
+                includePrInfo: false,
+                includeApprovalTree: false,
             });
 
             prNumber =
@@ -207,7 +302,7 @@ export class InboxService {
                         ((enrichedContext.pr as { header?: { purchaseRequisition?: string } } | undefined)?.header
                             ?.purchaseRequisition)
                     : undefined;
-            origin = rawTask.SAP__Origin;
+            origin = bundle.sapIdentifiers.sapOrigin;
         }
 
         if (!prNumber) {
@@ -245,10 +340,34 @@ export class InboxService {
     async executeDecision(
         identity: InboxIdentity,
         instanceId: string,
+        request: DecisionRequest,
+        executionContext?: ServiceExecutionContext
+    ): Promise<TaskActionResponse> {
+        if (!executionContext) {
+            return this.executeDecisionInternal(identity, instanceId, request);
+        }
+
+        return executeTaskDecisionBoundary({
+            appContext: executionContext.appContext,
+            sapContext: executionContext.sapContext,
+            decision: inferDecisionKind(request.decisionKey, request.type),
+            taskIdentifiers: {
+                instanceId,
+                sapOrigin: request._context?.sapOrigin,
+                documentId: request._context?.documentId,
+            },
+            execute: () => this.executeDecisionInternal(identity, instanceId, request),
+        });
+    }
+
+    private async executeDecisionInternal(
+        identity: InboxIdentity,
+        instanceId: string,
         request: DecisionRequest
     ): Promise<TaskActionResponse> {
         try {
             const clientCtx = request._context;
+            const adapterCtx = toAdapterContext(identity);
 
             if (request.comment) {
                 // If FE provided context, we know the document ID upfront
@@ -264,20 +383,21 @@ export class InboxService {
                         console.warn(`[InboxService] Non-fatal: Could not push approval comment: ${err instanceof Error ? err.message : String(err)}`);
                     }
                 } else {
-                    // No client context — fallback: lightly fetch task bundle to check if PR
+                    // No client context — fallback: fetch task bundle to check if PR
                     try {
-                        const rawTask = await this.sapClient.fetchTaskDetailBundle(
-                            identity.sapUser, instanceId, identity.userJwt
+                        const bundle = await this.detailAdapter.fetchTaskDetailBundle(
+                            adapterCtx, instanceId
                         );
-                        const task = normalizeTask(rawTask);
-                        const customAttributes = normalizeCustomAttributes(rawTask.CustomAttributeData?.results || []);
-                        const taskObjects = normalizeTaskObjects(rawTask.TaskObjects?.results || []);
-                        const resolvedContext = resolveBusinessContext(task, customAttributes, taskObjects);
+                        const resolvedContext = resolveBusinessContext(
+                            bundle.task,
+                            bundle.customAttributes,
+                            bundle.taskObjects
+                        );
                         if (resolvedContext.documentId) {
                             await this.prApprovalTreeClient.addPrComment(
                                 resolvedContext.documentId,
                                 request.comment,
-                                { origin: rawTask.SAP__Origin, userJwt: identity.userJwt, type: 'APPR' }
+                                { origin: bundle.sapIdentifiers.sapOrigin, userJwt: identity.userJwt, type: 'APPR' }
                             );
                             console.log(`[InboxService] Pushed approval comment via bundle fallback for ${resolvedContext.documentId}`);
                         }
@@ -287,20 +407,14 @@ export class InboxService {
                 }
             }
 
-            // Execute immediately without fetching decision options
-            await this.decisionHandler.execute(
-                identity.sapUser,
+            // Execute decision via adapter
+            const result = await this.decisionAdapter.executeDecision(adapterCtx, {
                 instanceId,
-                request,
-                [], // Pass empty, validation skipped for decisions check
-                identity.userJwt
-            );
+                decisionKey: request.decisionKey,
+                comment: request.comment,
+            });
 
-            return {
-                success: true,
-                message: `Decision executed successfully.`,
-                // We no longer reload the task after decision; UI invalidates automatically.
-            };
+            return assembleActionResponse(result.success, result.message);
         } catch (error) {
             if (error instanceof DecisionError) {
                 throw error;
@@ -313,28 +427,6 @@ export class InboxService {
     }
 
     /**
-     * Claim a task for the current user.
-     */
-    async claimTask(identity: InboxIdentity, instanceId: string): Promise<TaskActionResponse> {
-        await this.decisionHandler.claim(identity.sapUser, instanceId, identity.userJwt);
-        return {
-            success: true,
-            message: `Task ${instanceId} claimed successfully.`,
-        };
-    }
-
-    /**
-     * Release a claimed task.
-     */
-    async releaseTask(identity: InboxIdentity, instanceId: string): Promise<TaskActionResponse> {
-        await this.decisionHandler.release(identity.sapUser, instanceId, identity.userJwt);
-        return {
-            success: true,
-            message: `Task ${instanceId} released successfully.`,
-        };
-    }
-
-    /**
      * Forward a task to another user.
      */
     async forwardTask(
@@ -342,16 +434,17 @@ export class InboxService {
         instanceId: string,
         forwardTo: string
     ): Promise<TaskActionResponse> {
-        await this.decisionHandler.forward(identity.sapUser, instanceId, forwardTo, identity.userJwt);
-        return {
-            success: true,
-            message: `Task ${instanceId} forwarded to ${forwardTo}.`,
-        };
+        const adapterCtx = toAdapterContext(identity);
+        const result = await this.decisionAdapter.forwardTask(adapterCtx, {
+            instanceId,
+            forwardTo,
+        });
+        return assembleActionResponse(result.success, result.message);
     }
 
     /**
      * Add a comment to a task.
-     * Validates text, resolves origin, and delegates to SAP via $batch AddComment.
+     * Validates text, resolves origin, and delegates to SAP via the decision adapter.
      */
     async addComment(
         identity: InboxIdentity,
@@ -363,14 +456,15 @@ export class InboxService {
             throw Object.assign(new Error('Comment text is required.'), { httpStatus: 400 });
         }
 
-        const addSapTaskCommentPromise = this.sapClient.addComment(
-            identity.sapUser,
+        const adapterCtx = toAdapterContext(identity);
+
+        const addSapTaskCommentPromise = this.decisionAdapter.addComment(
+            adapterCtx,
             instanceId,
-            text.trim(),
-            identity.userJwt
-        ).then(rawComment => {
-            console.log(`[InboxService] Comment added to task ${instanceId}: ${rawComment.ID}`);
-            return rawComment;
+            text.trim()
+        ).then(result => {
+            console.log(`[InboxService] Comment added to task ${instanceId}: ${result.commentId}`);
+            return result;
         });
 
         const promises: Promise<any>[] = [addSapTaskCommentPromise];
@@ -390,49 +484,22 @@ export class InboxService {
 
         await Promise.allSettled(promises);
 
-        return {
-            success: true,
-            message: 'Comment added successfully.',
-        };
+        return assembleActionResponse(true, 'Comment added successfully.');
     }
 
     /**
      * Stream attachment binary content through the BFF.
-     * Resolves attachment metadata (origin, filename, mime type) then fetches binary.
+     * Delegates SAP interaction to detail adapter; applies business rules locally.
      */
     async streamAttachmentContent(
         identity: InboxIdentity,
         instanceId: string,
         attachmentId: string
     ): Promise<{ data: Buffer; contentType: string; fileName?: string }> {
-        const normalizedAttachmentId = decodeURIComponentSafeDeep(attachmentId);
+        const adapterCtx = toAdapterContext(identity);
 
-        // Fetch attachment metadata to resolve SAP__Origin and file info
-        const rawTask = await this.sapClient.fetchTaskDetailBundle(
-            identity.sapUser,
-            instanceId,
-            identity.userJwt
-        );
-        const origin = rawTask.SAP__Origin || process.env.SAP_TASK_ORIGIN || 'LOCAL';
-
-        // Use attachment metadata from task detail bundle to avoid extra key-predicate calls.
-        const attachments = rawTask.Attachments?.results || [];
-
-        const matchingAtt = attachments.find((a) => {
-            if (a.ID === normalizedAttachmentId || a.ID === attachmentId) return true;
-            return decodeURIComponentSafeDeep(a.ID) === normalizedAttachmentId;
-        });
-        const fileName = matchingAtt?.FileName || matchingAtt?.FileDisplayName;
-        const attachmentMetadataUri = matchingAtt?.__metadata?.uri;
-
-        const { data, contentType: rawContentType } = await this.sapClient.fetchAttachmentContent(
-            identity.sapUser,
-            instanceId,
-            normalizedAttachmentId,
-            origin,
-            attachmentMetadataUri,
-            identity.userJwt
-        );
+        const { data, contentType: rawContentType, fileName } =
+            await this.detailAdapter.streamAttachmentContent(adapterCtx, instanceId, attachmentId);
 
         // File size guard: 10MB default
         const maxSize = parseInt(process.env.MAX_ATTACHMENT_SIZE_MB || '10', 10) * 1024 * 1024;
@@ -456,7 +523,7 @@ export class InboxService {
 
     /**
      * Upload an attachment to a task.
-     * Validates file size and type, then delegates to SAP client.
+     * Validates file size and type, then delegates to the decision adapter.
      */
     async addAttachment(
         identity: InboxIdentity,
@@ -476,35 +543,96 @@ export class InboxService {
             );
         }
 
-        const rawAttachment = await this.sapClient.addAttachment(
-            identity.sapUser,
+        const adapterCtx = toAdapterContext(identity);
+
+        await this.decisionAdapter.addAttachment(adapterCtx, {
             instanceId,
             fileName,
             mimeType,
             buffer,
-            identity.userJwt,
-            sapOrigin
-        );
+            sapOrigin,
+        });
 
-        console.log(`[InboxService] Attachment uploaded to task ${instanceId}: ${rawAttachment.ID} (${fileName})`);
+        console.log(`[InboxService] Attachment uploaded to task ${instanceId}: (${fileName})`);
 
-        return {
-            success: true,
-            message: `Attachment "${fileName}" uploaded successfully.`,
-        };
+        return assembleActionResponse(true, `Attachment "${fileName}" uploaded successfully.`);
     }
 
     // ─── Helpers ──────────────────────────────────────────
+
+    private async withSapReadLogging<T>(
+        executionContext: ServiceExecutionContext | undefined,
+        sapOperation: string,
+        run: () => Promise<T>
+    ): Promise<T> {
+        if (!executionContext) {
+            return run();
+        }
+
+        const startedAt = Date.now();
+        logSapReadStarted(
+            executionContext.appContext,
+            executionContext.sapContext,
+            sapOperation
+        );
+
+        try {
+            const data = await run();
+            logSapReadFinished({
+                appContext: executionContext.appContext,
+                sapContext: executionContext.sapContext,
+                sapOperation,
+                status: 'success',
+                latencyMs: Date.now() - startedAt,
+            });
+            return data;
+        } catch (error) {
+            logSapReadFinished({
+                appContext: executionContext.appContext,
+                sapContext: executionContext.sapContext,
+                sapOperation,
+                status: 'error',
+                latencyMs: Date.now() - startedAt,
+            });
+            throw error;
+        }
+    }
+
+    private async enrichTaskForList(
+        identity: InboxIdentity,
+        task: InboxTask
+    ): Promise<void> {
+        const baseContext = resolveBusinessContext(task, [], []);
+        const enrichedContext = await enrichBusinessObjectData(identity, baseContext, {
+            sapOrigin: task.sapOrigin,
+            includeItemDetails: false,
+            includePrInfo: false,
+            includeApprovalTree: false,
+        });
+
+        task.businessContext = enrichedContext;
+        task.requestorName =
+            extractRequestorName(enrichedContext) ||
+            task.requestorName ||
+            task.createdByName;
+    }
 
     private isMockMode(): boolean {
         return shouldUseMock();
     }
 }
 
+// ─── Adapter Context Helper ───────────────────────────────
+
+function toAdapterContext(identity: InboxIdentity): AdapterContext {
+    return { sapUser: identity.sapUser, userJwt: identity.userJwt };
+}
+
 // ─── Factory ──────────────────────────────────────────────
 
 function createSapClient(): ISapTaskClient {
-    const useMock = shouldUseMock();
+    const runtimeAuth = resolveAuthRuntimeConfig();
+    const useMock = runtimeAuth.authMode === 'mock' || shouldUseMock();
 
     if (useMock) {
         console.log(
@@ -513,8 +641,8 @@ function createSapClient(): ISapTaskClient {
         return new MockSapTaskClient();
     }
 
-    const destinationName = process.env.SAP_TASK_DESTINATION || 'S4H_ODATA';
-    if (process.env.SAP_USE_DESTINATION !== 'false') {
+    const destinationName = runtimeAuth.destinationName;
+    if (runtimeAuth.useDestination) {
         console.log(`[SapClient] Using REAL SAP client via destination → ${destinationName}`);
     } else {
         console.log(`[SapClient] Using REAL SAP client via base URL → ${process.env.SAP_TASK_BASE_URL}`);
@@ -523,55 +651,58 @@ function createSapClient(): ISapTaskClient {
 }
 
 function shouldUseMock(): boolean {
-    if (process.env.USE_MOCK_SAP === 'true') return true;
+    const runtimeAuth = resolveAuthRuntimeConfig();
+    if (runtimeAuth.authMode === 'mock') return true;
     if (process.env.USE_MOCK_SAP === 'false') return false;
 
-    const destinationEnabled = process.env.SAP_USE_DESTINATION !== 'false';
-    const hasDestination = !!(process.env.SAP_TASK_DESTINATION || 'S4H_ODATA');
+    const hasDestination = !!runtimeAuth.destinationName;
     const hasBaseUrl = !!process.env.SAP_TASK_BASE_URL;
 
-    return !((destinationEnabled && hasDestination) || hasBaseUrl);
+    return !((runtimeAuth.useDestination && hasDestination) || hasBaseUrl);
 }
 
 function extractRequestorName(
     context: InboxTask['businessContext']
 ): string | undefined {
-    if (!context || context.type !== 'PR') return undefined;
+    if (!context) return undefined;
 
-    const pr = context.pr as
-        | {
-            header?: {
-                userFullName?: string;
-                purReqnRequestor?: string;
-                createdByUser?: string;
-            };
-        }
-        | undefined;
-    const header = pr?.header;
-    return (
-        header?.userFullName ||
-        header?.purReqnRequestor ||
-        header?.createdByUser ||
-        undefined
-    );
-}
-
-function decodeURIComponentSafe(value: string): string {
-    try {
-        return decodeURIComponent(value);
-    } catch {
-        return value;
+    if (context.type === 'PR') {
+        const pr = context.pr as
+            | {
+                header?: {
+                    userFullName?: string;
+                    purReqnRequestor?: string;
+                    createdByUser?: string;
+                };
+            }
+            | undefined;
+        const header = pr?.header;
+        return (
+            header?.userFullName ||
+            header?.purReqnRequestor ||
+            header?.createdByUser ||
+            undefined
+        );
     }
-}
 
-function decodeURIComponentSafeDeep(value: string, maxRounds = 3): string {
-    let current = value;
-    for (let i = 0; i < maxRounds; i += 1) {
-        const next = decodeURIComponentSafe(current);
-        if (next === current) return current;
-        current = next;
+    if (context.type === 'PO') {
+        const po = context.po as
+            | {
+                header?: {
+                    userFullName?: string;
+                    createdByUser?: string;
+                };
+            }
+            | undefined;
+        const header = po?.header;
+        return (
+            header?.userFullName ||
+            header?.createdByUser ||
+            undefined
+        );
     }
-    return current;
+
+    return undefined;
 }
 
 /** Infer MIME type from file extension when SAP returns application/octet-stream */

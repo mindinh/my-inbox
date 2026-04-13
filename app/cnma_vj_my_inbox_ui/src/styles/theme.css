@@ -304,6 +304,27 @@
    display: none;
 }
 
+/* ─── Sonner Toast Overrides ────────────────────────────── */
+
+/* Close button always visible & clickable */
+[data-sonner-toast] [data-close-button] {
+   opacity: 1 !important;
+   pointer-events: auto;
+}
+
+/* Ensure toasts are wide enough to read on desktop */
+[data-sonner-toaster] [data-sonner-toast] {
+   min-width: 320px;
+}
+
+/* Mobile: compact toasts, auto-width, never overflow screen */
+@media (max-width: 640px) {
+   [data-sonner-toaster] [data-sonner-toast] {
+      min-width: unset;
+      max-width: calc(100vw - 24px);
+   }
+}
+
 /* Custom Animations */
 @keyframes shimmer {
    0% {

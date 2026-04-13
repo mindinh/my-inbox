@@ -10,8 +10,6 @@ export interface InboxIdentity {
 }
 
 export interface TaskSupports {
-    claim: boolean;
-    release: boolean;
     forward: boolean;
     comments: boolean;
 }
@@ -321,6 +319,25 @@ export interface TaskDetail {
     workflowLogs: WorkflowLog[];
     attachments: TaskAttachment[];
     businessContext?: BusinessContext;
+}
+
+// ─── Dashboard ────────────────────────────────────────────
+
+export interface DashboardTask {
+    taskId: string;
+    documentNumber: string;
+    taskType: string;
+    documentType: string;
+    documentTypeDesc: string;
+    status: string;
+    currency: string;
+    totalNetAmount: number | null;
+    displayCurrency: string;
+}
+
+export interface DashboardResponse {
+    items: DashboardTask[];
+    total: number;
 }
 
 // ─── API Responses ────────────────────────────────────────

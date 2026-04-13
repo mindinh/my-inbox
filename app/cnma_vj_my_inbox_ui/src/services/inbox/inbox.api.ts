@@ -6,6 +6,7 @@ import type {
     DecisionRequest,
     ForwardRequest,
     WorkflowApprovalTreeResponse,
+    DashboardResponse,
 } from './inbox.types';
 
 // Keep API paths relative so Work Zone managed approuter can resolve app-local routes.
@@ -16,6 +17,17 @@ const BASE_URL = 'api/inbox';
  * Uses the existing axiosInstance which handles CSRF tokens, auth, and error retries.
  */
 export const inboxApi = {
+    /**
+     * Get dashboard data for the current user.
+     * Returns all task records from the ZI_PR_DASH_BOARD entity.
+     */
+    getDashboard: async (): Promise<DashboardResponse> => {
+        const { data } = await axiosInstance.get<DashboardResponse>(
+            `${BASE_URL}/dashboard`
+        );
+        return data;
+    },
+
     /**
      * Get tasks for the current user (with optional pagination).
      */
@@ -55,6 +67,26 @@ export const inboxApi = {
     },
 
     /**
+     * Get information-first task detail for fast initial detail render.
+     * Accepts optional hints from the task list item to help the backend
+     * skip redundant SAP round-trips and run enrichment in parallel.
+     */
+    getTaskInformation: async (
+        instanceId: string,
+        hints?: { sapOrigin?: string; documentId?: string; businessObjectType?: string }
+    ): Promise<TaskDetailResponse> => {
+        const query = new URLSearchParams();
+        if (hints?.sapOrigin) query.set('sapOrigin', hints.sapOrigin);
+        if (hints?.documentId) query.set('documentId', hints.documentId);
+        if (hints?.businessObjectType) query.set('businessObjectType', hints.businessObjectType);
+        const qs = query.toString();
+        const { data } = await axiosInstance.get<TaskDetailResponse>(
+            `${BASE_URL}/tasks/${encodeURIComponent(instanceId)}/information${qs ? `?${qs}` : ''}`
+        );
+        return data;
+    },
+
+    /**
      * Get approval workflow tree for PR tasks.
      */
     getWorkflowApprovalTree: async (
@@ -83,26 +115,6 @@ export const inboxApi = {
         const { data } = await axiosInstance.post<TaskActionResponse>(
             `${BASE_URL}/tasks/${encodeURIComponent(instanceId)}/decision`,
             request
-        );
-        return data;
-    },
-
-    /**
-     * Claim a task for the current user.
-     */
-    claimTask: async (instanceId: string): Promise<TaskActionResponse> => {
-        const { data } = await axiosInstance.post<TaskActionResponse>(
-            `${BASE_URL}/tasks/${encodeURIComponent(instanceId)}/claim`
-        );
-        return data;
-    },
-
-    /**
-     * Release a claimed task.
-     */
-    releaseTask: async (instanceId: string): Promise<TaskActionResponse> => {
-        const { data } = await axiosInstance.post<TaskActionResponse>(
-            `${BASE_URL}/tasks/${encodeURIComponent(instanceId)}/release`
         );
         return data;
     },

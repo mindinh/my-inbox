@@ -1,4 +1,4 @@
-import { ISapTaskClient } from '../sap-task-client';
+import { ISapTaskClient } from '../clients/sap-task-client';
 import {
     SapTaskRaw,
     SapDecisionOptionRaw,
@@ -298,7 +298,6 @@ const MOCK_ATTACHMENTS: Record<string, SapAttachmentRaw[]> = {
 
 // Track claimed/decided tasks for stateful mock behavior
 const executedDecisions = new Set<string>();
-const claimedTasks = new Set<string>();
 
 // ─── Mock Client Implementation ───────────────────────────
 
@@ -345,7 +344,8 @@ export class MockSapTaskClient implements ISapTaskClient {
     async fetchTaskDetailBundle(
         _sapUser: string,
         instanceId: string,
-        _userJwt?: string
+        _userJwt?: string,
+        _hints?: { sapOrigin?: string }
     ): Promise<SapTaskRaw> {
         await this.delay();
         console.log(`[MockSAP] fetchTaskDetailBundle(${instanceId})`);
@@ -474,18 +474,6 @@ export class MockSapTaskClient implements ISapTaskClient {
         await this.delay();
         console.log(`[MockSAP] executeDecision(${instanceId}, key=${decisionKey}, comment="${comment || ''}")`);
         executedDecisions.add(instanceId);
-    }
-
-    async claimTask(_sapUser: string, instanceId: string, _userJwt?: string): Promise<void> {
-        await this.delay();
-        console.log(`[MockSAP] claimTask(${instanceId})`);
-        claimedTasks.add(instanceId);
-    }
-
-    async releaseTask(_sapUser: string, instanceId: string, _userJwt?: string): Promise<void> {
-        await this.delay();
-        console.log(`[MockSAP] releaseTask(${instanceId})`);
-        claimedTasks.delete(instanceId);
     }
 
     async forwardTask(

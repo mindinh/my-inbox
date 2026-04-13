@@ -2,6 +2,8 @@ import cds from '@sap/cds';
 import express from 'express';
 import passport from 'passport';
 import { createInboxRouter } from './inbox/inbox-router';
+import { resolveAuthRuntimeConfig } from './core/config/auth-mode';
+import { logStartupAuthContext } from './core/logging/request-log';
 
 /**
  * Custom server configuration
@@ -16,9 +18,11 @@ import { createInboxRouter } from './inbox/inbox-router';
  * exchange it for an SAP assertion token.
  */
 cds.on('bootstrap', (app: express.Application) => {
+    const runtimeAuthConfig = resolveAuthRuntimeConfig();
+    logStartupAuthContext(runtimeAuthConfig);
     // ─── Auth middleware for custom routes ────────────────────────────
     const authKind = cds.env.requires?.auth?.kind;
-    const isMockMode = process.env.USE_MOCK_SAP === 'true';
+    const isMockMode = runtimeAuthConfig.authMode === 'mock';
     const isXsuaa = authKind === 'xsuaa' && !isMockMode;
 
     if (isMockMode) {

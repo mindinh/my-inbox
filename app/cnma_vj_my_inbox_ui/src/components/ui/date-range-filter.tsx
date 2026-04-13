@@ -281,10 +281,10 @@ export function DateRangeFilter({
                         onBlur={handleInputBlur}
                         onKeyDown={handleInputKeyDown}
                         placeholder={placeholder}
+                        readOnly={'ontouchstart' in window}
                         className="flex-1 h-full px-3 text-sm bg-transparent outline-none border-none placeholder:text-muted-foreground"
-                        onClick={(e) => e.stopPropagation()}
                     />
-                    <CalendarIcon className="h-4 w-4 text-muted-foreground shrink-0 mr-3" />
+                    <CalendarIcon className="h-4 w-4 text-muted-foreground shrink-0 mr-3 pointer-events-none" />
                 </div>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0" align="start">

@@ -1,0 +1,173 @@
+{
+    "app": {
+        "name": "Ứng dụng Phê duyệt",
+        "title": "Hộp thư đến"
+    },
+    "common": {
+        "actions": "Thao tác",
+        "approve": "Phê duyệt",
+        "back": "Quay lại",
+        "cancel": "Hủy",
+        "close": "Đóng",
+        "confirm": "Xác nhận",
+        "create": "Tạo mới",
+        "delete": "Xóa",
+        "edit": "Chỉnh sửa",
+        "error": "Đã xảy ra lỗi",
+        "filter": "Bộ lọc",
+        "loading": "Đang tải...",
+        "no": "Không",
+        "noData": "Không có dữ liệu",
+        "refresh": "Tải lại",
+        "reject": "Từ chối",
+        "save": "Lưu",
+        "search": "Tìm kiếm",
+        "status": "Trạng thái",
+        "submit": "Gửi",
+        "success": "Thành công",
+        "warning": "Cảnh báo",
+        "yes": "Có",
+        "forward": "Chuyển tiếp",
+        "comment": "Bình luận",
+        "download": "Tải xuống",
+        "upload": "Tải lên",
+        "retry": "Thử lại",
+        "all": "Tất cả",
+        "selected": "Đã chọn",
+        "items": "mục",
+        "of": "trong",
+        "total": "Tổng",
+        "clearFilters": "Xóa bộ lọc"
+    },
+    "nav": {
+        "dashboard": "Bảng điều khiển",
+        "myInbox": "Hộp thư đến",
+        "substitutionInbox": "Hộp thư thay thế"
+    },
+    "dashboard": {
+        "title": "Bảng điều khiển",
+        "subtitle": "Tổng quan & phân tích công việc",
+        "loadingDashboard": "Đang tải bảng điều khiển…",
+        "failedToLoad": "Không thể tải bảng điều khiển",
+        "tryRefreshing": "Vui lòng thử tải lại trang.",
+        "clearFilters": "Xóa bộ lọc",
+        "statCards": {
+            "totalTasks": "Tổng công việc",
+            "taskTypes": "Loại công việc",
+            "ready": "Sẵn sàng",
+            "inProcess": "Đang xử lý",
+            "approved": "Đã duyệt"
+        },
+        "charts": {
+            "tasksByStatus": "CÔNG VIỆC THEO TRẠNG THÁI",
+            "tasksByType": "CÔNG VIỆC THEO LOẠI",
+            "taskDetails": "CHI TIẾT CÔNG VIỆC",
+            "tasks": "CÔNG VIỆC",
+            "groupedByTaskType": "Nhóm theo loại công việc",
+            "filteredBy": "Lọc theo: {{filter}}",
+            "allTasks": "Tất cả công việc",
+            "noTasksFound": "Không tìm thấy công việc",
+            "inProcess": "Đang xử lý",
+            "remaining": "Còn lại"
+        },
+        "table": {
+            "rowNumber": "#",
+            "type": "LOẠI",
+            "docNumber": "SỐ CHỨNG TỪ",
+            "status": "TRẠNG THÁI",
+            "amount": "SỐ TIỀN"
+        },
+        "filters": {
+            "status": "Trạng thái: {{status}}",
+            "type": "Loại: {{type}}"
+        },
+        "itemsCount": "{{count}} mục"
+    },
+    "inbox": {
+        "title": "Hộp thư đến",
+        "tasks": "Công việc",
+        "noTasks": "Không có công việc",
+        "pending": "Đang chờ",
+        "completed": "Hoàn thành",
+        "overdue": "Quá hạn",
+        "taskList": "Danh sách công việc",
+        "taskDetails": "Chi tiết công việc",
+        "massActions": "Thao tác hàng loạt",
+        "selectAll": "Chọn tất cả",
+        "deselectAll": "Bỏ chọn tất cả"
+    },
+    "task": {
+        "information": "Thông tin",
+        "approvalTree": "Cây phê duyệt",
+        "comments": "Bình luận",
+        "attachments": "Tệp đính kèm",
+        "history": "Lịch sử",
+        "addComment": "Thêm bình luận...",
+        "sendComment": "Gửi",
+        "noComments": "Chưa có bình luận",
+        "noAttachments": "Không có tệp đính kèm",
+        "dropFilesHere": "Kéo thả tệp vào đây để tải lên",
+        "uploadAttachment": "Tải tệp đính kèm",
+        "documentNumber": "Số chứng từ",
+        "taskType": "Loại công việc",
+        "createdBy": "Người tạo",
+        "createdOn": "Ngày tạo",
+        "priority": "Mức ưu tiên",
+        "dueDate": "Hạn chót",
+        "status": "Trạng thái",
+        "description": "Mô tả"
+    },
+    "decision": {
+        "approve": "Phê duyệt",
+        "reject": "Từ chối",
+        "forward": "Chuyển tiếp",
+        "approving": "Đang phê duyệt...",
+        "rejecting": "Đang từ chối...",
+        "forwarding": "Đang chuyển tiếp...",
+        "approveSuccess": "Phê duyệt thành công",
+        "rejectSuccess": "Từ chối thành công",
+        "forwardSuccess": "Chuyển tiếp thành công",
+        "approveFailed": "Phê duyệt thất bại",
+        "rejectFailed": "Từ chối thất bại",
+        "forwardFailed": "Chuyển tiếp thất bại",
+        "confirmApprove": "Bạn có chắc muốn phê duyệt công việc này không?",
+        "confirmReject": "Bạn có chắc muốn từ chối công việc này không?",
+        "confirmForward": "Chuyển tiếp công việc này cho người khác?",
+        "massApprove": "Phê duyệt hàng loạt",
+        "massReject": "Từ chối hàng loạt",
+        "massApproving": "Đang phê duyệt {{count}} công việc...",
+        "massRejecting": "Đang từ chối {{count}} công việc...",
+        "massApproveSuccess": "Đã phê duyệt {{count}} công việc thành công",
+        "massRejectSuccess": "Đã từ chối {{count}} công việc thành công"
+    },
+    "status": {
+        "ready": "Sẵn sàng",
+        "inProcess": "Đang xử lý",
+        "approved": "Đã duyệt",
+        "rejected": "Đã từ chối",
+        "completed": "Hoàn thành",
+        "draft": "Bản nháp",
+        "submitted": "Đã gửi"
+    },
+    "priority": {
+        "high": "Cao",
+        "medium": "Trung bình",
+        "low": "Thấp",
+        "veryHigh": "Rất cao"
+    },
+    "errors": {
+        "networkError": "Lỗi mạng. Vui lòng kiểm tra kết nối.",
+        "sessionExpired": "Phiên đã hết hạn. Vui lòng đăng nhập lại.",
+        "unauthorized": "Bạn không có quyền thực hiện thao tác này.",
+        "serverError": "Lỗi máy chủ. Vui lòng thử lại sau.",
+        "notFound": "Không tìm thấy tài nguyên yêu cầu."
+    },
+    "toasts": {
+        "actionInProgress": "Đang xử lý...",
+        "downloadStarted": "Bắt đầu tải xuống",
+        "downloadComplete": "Tải xuống hoàn tất",
+        "downloadFailed": "Tải xuống thất bại",
+        "uploadComplete": "Tải lên hoàn tất",
+        "uploadFailed": "Tải lên thất bại"
+    }
+}
