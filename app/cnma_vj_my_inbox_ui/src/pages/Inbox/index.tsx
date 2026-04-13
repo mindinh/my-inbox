@@ -1,10 +1,12 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useTranslation } from 'react-i18next';
+import { Menu } from 'lucide-react';
 import { TaskList } from '@/pages/Inbox/components/TaskList';
 import { TaskDetailView } from '@/pages/Inbox/components/TaskDetailView';
 import { MassSelectionView } from '@/pages/Inbox/components/MassSelectionView';
-import { TaskScopeSidebar, TaskScopeFloatingBar } from '@/pages/Inbox/components/TaskScopeSidebar';
+import { TaskScopeSidebar, MobileSidebarSheet } from '@/pages/Inbox/components/TaskScopeSidebar';
 import {
     useTasks,
     useApprovedTasks,
@@ -17,7 +19,8 @@ import { useIsMobile } from '@/components/ui/use-mobile';
 
 type TaskScope = 'my' | 'approved';
 
-export default function InboxPageNext() {
+export default function InboxPage() {
+    const { t } = useTranslation();
     const PAGE_SIZE = 5;
     const DETAIL_PREFETCH_DELAY_MS = 200;
     const { taskId } = useParams<{ taskId?: string }>();
@@ -29,6 +32,7 @@ export default function InboxPageNext() {
         (location.state as any)?.scope || 'my'
     );
     const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
+    const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
     const [selectionMode, setSelectionMode] = useState(false);
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
     const [currentPage, setCurrentPage] = useState(0);
@@ -213,13 +217,31 @@ export default function InboxPageNext() {
     }, [activeTasksQuery]);
 
     const showMassSelection = showTaskActions && isMyScope && selectionMode && selectedIds.size > 0;
-    const showMobileScopeBar = !selectedTaskId && !selectionMode;
 
     if (isMobile) {
         return (
-            <div className="relative h-screen overflow-hidden bg-background">
-                <AnimatePresence mode="wait">
-                    {selectedTaskId ? (
+            <div className="relative h-screen flex flex-col overflow-hidden bg-background">
+                {/* Mobile App Header — gradient background */}
+                {!selectedTaskId && !selectionMode && (
+                    <div
+                        className="px-4 py-3 flex items-center shadow-sm relative z-20 shrink-0"
+                        style={{ background: 'linear-gradient(135deg, var(--primary) 0%, var(--primary-hover) 100%)' }}
+                    >
+                        <button
+                            onClick={() => setMobileMenuOpen(true)}
+                            className="flex items-center justify-center w-9 h-9 rounded-lg transition-colors hover:bg-white/10 active:bg-white/20 absolute left-4"
+                            aria-label="Open navigation menu"
+                        >
+                            <Menu size={22} className="text-white" />
+                        </button>
+                        <h1 className="text-lg font-bold text-white tracking-wide w-full text-center">
+                            {scope === 'approved' ? t('nav.approvedTasks', 'Approved Tasks') : t('nav.myTasks', 'My Tasks')}
+                        </h1>
+                    </div>
+                )}
+                <div className="relative flex-1 min-h-0">
+                    <AnimatePresence mode="wait">
+                        {selectedTaskId ? (
                         <motion.div
                             key="detail"
                             initial={{ x: '100%' }}
@@ -267,17 +289,19 @@ export default function InboxPageNext() {
                                 onMassDecision={showTaskActions && isMyScope ? handleMassDecision : undefined}
                                 isExecutingMass={showTaskActions && isMyScope && decisionMutation.isPending}
                                 showTaskActions={showTaskActions && isMyScope}
-                                hasMobileScopeBar={showMobileScopeBar}
+                                hasMobileScopeBar={false}
                             />
                         </motion.div>
                     )}
                 </AnimatePresence>
-                {showMobileScopeBar && (
-                    <TaskScopeFloatingBar
-                        scope={scope}
-                        onScopeChange={handleScopeChange}
-                    />
-                )}
+                </div>
+                <MobileSidebarSheet
+                    isOpen={mobileMenuOpen}
+                    onClose={() => setMobileMenuOpen(false)}
+                    scope={scope}
+                    onScopeChange={handleScopeChange}
+                    username={tasksResponse?.identity?.btpUser}
+                />
             </div>
         );
     }

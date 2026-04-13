@@ -1,8 +1,10 @@
-import { CheckCheck, ChevronLeft, ChevronRight, Inbox, LayoutDashboard } from 'lucide-react';
+import { CheckCheck, ChevronLeft, ChevronRight, Home, Inbox, LayoutDashboard, X } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
+import { useTranslation } from 'react-i18next';
+import { motion, AnimatePresence } from 'framer-motion';
 
-type TaskScope = 'my' | 'approved' | 'dashboard';
+type TaskScope = 'my' | 'approved' | 'dashboard' | 'home';
 
 interface TaskScopeSidebarProps {
     scope: TaskScope;
@@ -11,16 +13,37 @@ interface TaskScopeSidebarProps {
     onToggleCollapse: () => void;
 }
 
-interface TaskScopeFloatingBarProps {
+interface MobileSidebarSheetProps {
+    isOpen: boolean;
+    onClose: () => void;
     scope: TaskScope;
-    onScopeChange: (scope: TaskScope) => void;
+    onScopeChange: (scope: 'my' | 'approved') => void;
+    /** Display name shown under the app title in the drawer header */
+    username?: string;
 }
 
-const scopeItems: Array<{ value: TaskScope; label: string; icon: typeof Inbox; route?: string }> = [
-    { value: 'my', label: 'My Tasks', icon: Inbox, route: '/' },
-    { value: 'approved', label: 'Approved Tasks', icon: CheckCheck, route: '/' },
-    { value: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, route: '/dashboard' },
-];
+/** Desktop-only nav items (no Home — it's mobile-only) */
+export function useScopeItems() {
+    const { t } = useTranslation();
+    return [
+        { value: 'my' as TaskScope, label: t('nav.myTasks'), icon: Inbox, route: '/' },
+        { value: 'approved' as TaskScope, label: t('nav.approvedTasks'), icon: CheckCheck, route: '/' },
+        { value: 'dashboard' as TaskScope, label: t('nav.dashboard'), icon: LayoutDashboard, route: '/dashboard' },
+    ];
+}
+
+/** Mobile nav items include Home at the top */
+function useMobileScopeItems() {
+    const { t } = useTranslation();
+    return [
+        { value: 'home' as TaskScope, label: t('nav.home', 'Home'), icon: Home, route: '/home' },
+        { value: 'my' as TaskScope, label: t('nav.myTasks'), icon: Inbox, route: '/' },
+        { value: 'approved' as TaskScope, label: t('nav.approvedTasks'), icon: CheckCheck, route: '/' },
+        { value: 'dashboard' as TaskScope, label: t('nav.dashboard'), icon: LayoutDashboard, route: '/dashboard' },
+    ];
+}
+
+// ── Desktop sidebar ──────────────────────────────────────
 
 export function TaskScopeSidebar({
     scope,
@@ -31,6 +54,7 @@ export function TaskScopeSidebar({
     const navigate = useNavigate();
     const location = useLocation();
     const isDashboard = location.pathname === '/dashboard';
+    const scopeItems = useScopeItems();
     return (
         <aside
             className={cn(
@@ -97,47 +121,129 @@ export function TaskScopeSidebar({
     );
 }
 
-export function TaskScopeFloatingBar({ scope, onScopeChange }: TaskScopeFloatingBarProps) {
+// ── Mobile sidebar drawer (matches reference prorequest design) ──
+// Animated slide-in panel with gradient header, app name, close button,
+// and nav items with active indicator bar on the left edge.
+
+export function MobileSidebarSheet({
+    isOpen,
+    onClose,
+    scope,
+    onScopeChange,
+    username,
+}: MobileSidebarSheetProps) {
+    const { t } = useTranslation();
     const navigate = useNavigate();
     const location = useLocation();
     const isDashboard = location.pathname === '/dashboard';
-    return (
-        <div className="pointer-events-none fixed inset-x-0 bottom-0 z-30 px-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
-            <div className="pointer-events-auto mx-auto flex max-w-md items-center gap-2 rounded-2xl border border-slate-200 bg-white/95 p-2 shadow-[0_10px_25px_rgba(15,23,42,0.16)] backdrop-blur-sm">
-                {scopeItems.map((item) => {
-                    const Icon = item.icon;
-                    const isActive = item.value === 'dashboard'
-                        ? isDashboard
-                        : !isDashboard && scope === item.value;
+    const isHome = location.pathname === '/home';
+    const scopeItems = useMobileScopeItems();
 
-                    return (
-                        <button
-                            key={item.value}
-                            type="button"
-                            onClick={() => {
-                                if (item.route === '/dashboard') {
-                                    navigate('/dashboard');
-                                } else {
-                                    if (isDashboard) {
-                                        navigate('/', { state: { scope: item.value } });
-                                    } else {
-                                        onScopeChange(item.value as 'my' | 'approved');
-                                    }
-                                }
+    return (
+        <AnimatePresence>
+            {isOpen && (
+                <>
+                    {/* Backdrop */}
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        transition={{ duration: 0.2 }}
+                        className="fixed inset-0 bg-black/40 z-40 md:hidden"
+                        onClick={onClose}
+                        aria-hidden="true"
+                    />
+
+                    {/* Drawer Panel */}
+                    <motion.div
+                        initial={{ x: '-100%' }}
+                        animate={{ x: 0 }}
+                        exit={{ x: '-100%' }}
+                        transition={{ type: 'spring', damping: 28, stiffness: 320 }}
+                        className="fixed top-0 left-0 h-full w-[280px] bg-white shadow-2xl z-50 flex flex-col md:hidden"
+                        role="dialog"
+                        aria-modal="true"
+                        aria-label="Navigation menu"
+                    >
+                        {/* Header - Brand Red Gradient */}
+                        <div
+                            className="relative px-5 pt-6 pb-5"
+                            style={{
+                                background: 'linear-gradient(135deg, var(--primary) 0%, var(--primary-hover) 100%)',
                             }}
-                            className={cn(
-                                'flex min-w-0 flex-1 items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-xs font-semibold transition-colors',
-                                isActive
-                                    ? 'bg-primary text-primary-foreground'
-                                    : 'bg-transparent text-slate-600 hover:bg-slate-100 hover:text-slate-800'
-                            )}
                         >
-                            <Icon className="size-4 shrink-0" />
-                            <span className="truncate">{item.label}</span>
-                        </button>
-                    );
-                })}
-            </div>
-        </div>
+                            <button
+                                type="button"
+                                onClick={onClose}
+                                className="absolute top-4 right-4 text-white/80 hover:text-white transition-colors p-1"
+                                aria-label="Close menu"
+                            >
+                                <X className="w-5 h-5" />
+                            </button>
+                            <div className="text-white">
+                                <p className="text-base font-bold tracking-tight">prorequest</p>
+                                <p className="text-sm text-white/70 mt-0.5">{username || 'User'}</p>
+                            </div>
+                        </div>
+
+                        {/* Navigation Items */}
+                        <nav className="flex-1 py-2" aria-label="Main navigation">
+                            {scopeItems.map((item) => {
+                                const Icon = item.icon;
+                                const isActive = item.value === 'dashboard'
+                                    ? isDashboard
+                                    : item.value === 'home'
+                                        ? isHome
+                                        : !isDashboard && !isHome && scope === item.value;
+
+                                return (
+                                    <button
+                                        key={item.value}
+                                        type="button"
+                                        onClick={() => {
+                                            onClose();
+                                            if (item.route === '/home') {
+                                                navigate('/home');
+                                            } else if (item.route === '/dashboard') {
+                                                navigate('/dashboard');
+                                            } else {
+                                                if (isDashboard || isHome) {
+                                                    navigate('/', { state: { scope: item.value } });
+                                                } else {
+                                                    onScopeChange(item.value as 'my' | 'approved');
+                                                }
+                                            }
+                                        }}
+                                        className={cn(
+                                            'flex w-full items-center gap-4 px-5 py-3.5 text-[15px] font-medium transition-colors relative',
+                                            isActive
+                                                ? 'text-primary bg-primary/5'
+                                                : 'text-foreground hover:bg-muted'
+                                        )}
+                                    >
+                                        {/* Active indicator bar */}
+                                        {isActive && (
+                                            <span
+                                                className="absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-r-full bg-primary"
+                                                aria-hidden="true"
+                                            />
+                                        )}
+                                        <Icon className="w-5 h-5 flex-shrink-0" aria-hidden="true" />
+                                        <span>{item.label}</span>
+                                    </button>
+                                );
+                            })}
+                        </nav>
+                    </motion.div>
+                </>
+            )}
+        </AnimatePresence>
     );
+}
+
+// Keep TaskScopeFloatingBar as a deprecated export for backward compat
+// (can be removed once all pages migrate to MobileSidebarSheet)
+/** @deprecated Use MobileSidebarSheet instead */
+export function TaskScopeFloatingBar({ scope, onScopeChange }: { scope: TaskScope; onScopeChange: (scope: TaskScope) => void }) {
+    return null; // No-op — replaced by hamburger sidebar
 }

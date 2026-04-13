@@ -333,6 +333,7 @@ export interface DashboardTask {
     currency: string;
     totalNetAmount: number | null;
     displayCurrency: string;
+    createdAt?: string;
 }
 
 export interface DashboardResponse {

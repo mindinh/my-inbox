@@ -129,14 +129,15 @@ function normalizeStatus(raw: string): string {
     // Map common SAP TASKPROCESSING statuses to dashboard-friendly labels
     switch (upper) {
         case 'READY':
-            return 'Ready';
         case 'RESERVED':
         case 'IN_PROGRESS':
         case 'STARTED':
-            return 'In Process';
+            return 'New';
         case 'COMPLETED':
         case 'APPROVED':
             return 'Approved';
+        case 'REJECTED':
+            return 'Rejected';
         default:
             return raw;
     }

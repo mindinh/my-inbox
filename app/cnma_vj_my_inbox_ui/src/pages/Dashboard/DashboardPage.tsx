@@ -2,21 +2,28 @@ import { useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { TaskScopeSidebar, TaskScopeFloatingBar } from '@/pages/Inbox/components/TaskScopeSidebar';
+import { TaskScopeSidebar, MobileSidebarSheet } from '@/pages/Inbox/components/TaskScopeSidebar';
 import { useIsMobile } from '@/components/ui/use-mobile';
 import {
-    CircleCheck,
-    BadgeCheck,
-    Clock,
-    Layers,
     ListFilter,
     X,
     Loader2,
     AlertCircle,
+    Menu,
+    ChevronRight,
 } from 'lucide-react';
-import { useDashboardQuery, useDashboardData, STATUS_COLORS } from './use-dashboard-data';
-import type { DonutSegment } from './use-dashboard-data';
+import { useDashboardQuery, useDashboardData, STATUS_COLORS, STATUS_LABELS } from './use-dashboard-data';
+import type { DonutSegment, BarDataItem } from './use-dashboard-data';
 import { StatusBadge } from '@/pages/Inbox/components/TaskBadges';
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from '@/components/ui/table';
+import { cn } from '@/lib/utils';
 
 // ═══════════════════════════════════════════════════════════
 // SVG Donut Chart
@@ -95,18 +102,24 @@ function DonutChart({
 }
 
 // ═══════════════════════════════════════════════════════════
-// Horizontal Bar Chart (In Process / Remaining style)
-// Matches reference: label on left, count below, grey bar = total, orange bar = in process
+// Stacked Horizontal Bar Chart (New / Approved / Rejected)
+// Always shows all 3 segments. selectedStatus greys out non-active.
 // ═══════════════════════════════════════════════════════════
 
-function HorizontalBarChart({
+function StackedBarChart({
     data,
-    selectedLabel,
+    selectedTypeLabel,
+    selectedStatus,
     onBarClick,
+    onStatusClick,
+    isMobile = false,
 }: {
-    data: { label: string; total: number; inProcess: number }[];
-    selectedLabel: string | null;
+    data: BarDataItem[];
+    selectedTypeLabel: string | null;
+    selectedStatus: string | null;
     onBarClick: (label: string) => void;
+    onStatusClick: (status: string) => void;
+    isMobile?: boolean;
 }) {
     if (data.length === 0) {
         return (
@@ -119,18 +132,25 @@ function HorizontalBarChart({
     const maxVal = Math.max(...data.map((d) => d.total), 1);
     const axisMax = Math.ceil(maxVal / 5) * 5 || 5;
     const ticks = Array.from({ length: 6 }, (_, i) => Math.round((axisMax / 5) * i));
-    const barH = 14;
-    const rowHeight = 64;
-    const labelWidth = 160;
-    const chartLeft = labelWidth + 16;
-    const chartWidth = 280;
+
+    // Mobile-friendly dimensions
+    const barH = isMobile ? 20 : 16;
+    const rowHeight = isMobile ? 80 : 68;
+    const labelWidth = isMobile ? 100 : 140;
+    const chartLeft = labelWidth + 12;
+    const chartRight = 24;
+    const svgWidth = isMobile ? 360 : 500;
+    const chartWidth = svgWidth - chartLeft - chartRight;
     const totalHeight = data.length * rowHeight + 36;
+    const fontSize = isMobile ? '10px' : '11px';
+    const subFontSize = isMobile ? '10px' : '11px';
 
     return (
         <svg
-            viewBox={`0 0 ${chartLeft + chartWidth + 20} ${totalHeight}`}
+            viewBox={`0 0 ${svgWidth} ${totalHeight}`}
             width="100%"
-            style={{ overflow: 'visible' }}
+            preserveAspectRatio="xMidYMid meet"
+            style={{ overflow: 'visible', touchAction: 'manipulation' }}
         >
             {/* Grid lines */}
             {ticks.map((tick) => {
@@ -159,56 +179,111 @@ function HorizontalBarChart({
             {/* Data rows */}
             {data.map((d, i) => {
                 const yBase = i * rowHeight + 6;
-                const barY = yBase + 8;
-                const totalW = Math.max((d.total / axisMax) * chartWidth, 2);
-                const inProcessW = Math.max((d.inProcess / axisMax) * chartWidth, 0);
+                const barY = yBase + 10;
 
-                const isBarActive = selectedLabel === d.label;
-                const isBarFiltered = selectedLabel != null && !isBarActive;
+                const isBarActive = selectedTypeLabel === d.label;
+                const isBarFiltered = selectedTypeLabel != null && !isBarActive;
+
+                // Build stacked segments: start from base if selected
+                let xOffset = 0;
+
+                // If a status is selected, put it first in the ordering so it is anchored to the base
+                const orderedStatuses = selectedStatus
+                    ? [selectedStatus, ...STATUS_LABELS.filter(s => s !== selectedStatus)]
+                    : STATUS_LABELS;
+
+                const segments = orderedStatuses.map((status) => {
+                    const count = d.statusCounts[status] || 0;
+                    const width = Math.max((count / axisMax) * chartWidth, 0);
+                    const seg = { status, count, width, x: chartLeft + xOffset };
+                    xOffset += width;
+                    return seg;
+                });
+
+                // Sub-label: show selectedStatus count / total, or just total
+                const subLabel = selectedStatus
+                    ? `${d.statusCounts[selectedStatus] || 0}/${d.total}`
+                    : `${d.total} total`;
 
                 return (
                     <g
                         key={d.label}
-                        style={{ cursor: 'pointer', opacity: isBarFiltered ? 0.32 : 1, transition: 'opacity 0.2s ease' }}
-                        onClick={() => onBarClick(d.label)}
+                        style={{ opacity: isBarFiltered ? 0.32 : 1, transition: 'opacity 0.2s ease' }}
                     >
-                        {/* Hit area */}
-                        <rect x={0} y={yBase - 4} width={chartLeft + chartWidth + 20} height={rowHeight}
-                            fill="transparent" />
+                        {/* Hit area for type selection */}
+                        <rect x={0} y={yBase - 4} width={labelWidth} height={rowHeight}
+                            fill="transparent" style={{ cursor: 'pointer' }}
+                            onClick={() => onBarClick(d.label)} />
 
                         {/* ── Label: type name ── */}
-                        <text x={labelWidth} y={barY + barH / 2 - 1} textAnchor="end" dominantBaseline="central"
+                        <text x={labelWidth - 4} y={barY + barH / 2 - 1} textAnchor="end" dominantBaseline="central"
                             style={{
                                 fill: isBarActive ? 'var(--primary)' : 'var(--foreground)',
-                                fontSize: '12px',
+                                fontSize,
                                 fontWeight: isBarActive ? 700 : 600,
-                            }}>
-                            {d.label.length > 20 ? d.label.slice(0, 20) + '…' : d.label}
+                                cursor: 'pointer',
+                            }}
+                            onClick={() => onBarClick(d.label)}>
+                            {d.label.length > (isMobile ? 14 : 22) ? d.label.slice(0, isMobile ? 14 : 22) + '…' : d.label}
                         </text>
 
-                        {/* ── Sub-label: in-process / total ── */}
-                        <text x={labelWidth} y={barY + barH + 16} textAnchor="end" dominantBaseline="central"
+                        {/* ── Sub-label: count ── */}
+                        <text x={labelWidth - 4} y={barY + barH + 16} textAnchor="end" dominantBaseline="central"
                             style={{
-                                fill: 'var(--muted-foreground)',
-                                fontSize: '11px',
-                                fontWeight: 500,
+                                fill: selectedStatus ? STATUS_COLORS[selectedStatus] : 'var(--muted-foreground)',
+                                fontSize: subFontSize,
+                                fontWeight: selectedStatus ? 700 : 500,
                             }}>
-                            {d.inProcess}/{d.total}
+                            {subLabel}
                         </text>
 
-                        {/* ── Grey bar: Remaining (total) ── */}
-                        <rect x={chartLeft} y={barY} width={totalW} height={barH}
-                            rx={3} fill="#d1d5db">
-                            <animate attributeName="width" from="0" to={totalW} dur="0.45s" fill="freeze" />
-                        </rect>
+                        {/* ── Stacked segments ── */}
+                        {segments.map((seg) => {
+                            if (seg.count === 0) return null;
+                            const isStatusFiltered = selectedStatus != null && selectedStatus !== seg.status;
 
-                        {/* ── Orange bar: In Process ── */}
-                        {d.inProcess > 0 && (
-                            <rect x={chartLeft} y={barY} width={inProcessW} height={barH}
-                                rx={3} fill={STATUS_COLORS['In Process']}>
-                                <animate attributeName="width" from="0" to={inProcessW} dur="0.45s" fill="freeze" />
-                            </rect>
-                        )}
+                            // Round corners
+                            const visibleSegs = segments.filter((s) => s.count > 0);
+                            const isFirst = visibleSegs[0]?.status === seg.status;
+                            const isLast = visibleSegs[visibleSegs.length - 1]?.status === seg.status;
+
+                            return (
+                                <g key={seg.status}>
+                                    <rect
+                                        x={seg.x}
+                                        y={barY}
+                                        width={seg.width}
+                                        height={barH}
+                                        rx={isFirst && isLast ? 3 : 0}
+                                        fill={isStatusFiltered ? '#d1d5db' : STATUS_COLORS[seg.status]}
+                                        style={{ cursor: 'pointer', transition: 'all 0.45s ease' }}
+                                        onClick={() => onStatusClick(seg.status)}
+                                    >
+                                        <animate attributeName="width" from="0" to={seg.width} dur="0.45s" fill="freeze" />
+                                    </rect>
+                                    {/* Left rounded cap for first segment */}
+                                    {isFirst && (
+                                        <rect
+                                            x={seg.x} y={barY}
+                                            width={Math.min(seg.width, 6)} height={barH}
+                                            rx={3} ry={3}
+                                            fill={isStatusFiltered ? '#d1d5db' : STATUS_COLORS[seg.status]}
+                                            style={{ pointerEvents: 'none', transition: 'fill 0.25s ease' }}
+                                        />
+                                    )}
+                                    {/* Right rounded cap for last segment */}
+                                    {isLast && seg.width > 6 && (
+                                        <rect
+                                            x={seg.x + seg.width - 6} y={barY}
+                                            width={6} height={barH}
+                                            rx={3} ry={3}
+                                            fill={isStatusFiltered ? '#d1d5db' : STATUS_COLORS[seg.status]}
+                                            style={{ pointerEvents: 'none', transition: 'fill 0.25s ease' }}
+                                        />
+                                    )}
+                                </g>
+                            );
+                        })}
                     </g>
                 );
             })}
@@ -225,6 +300,7 @@ export default function DashboardPage() {
     const [selectedStatus, setSelectedStatus] = useState<string | null>(null);
     const [selectedType, setSelectedType] = useState<string | null>(null);
     const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
+    const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
     const isMobile = useIsMobile();
     const navigate = useNavigate();
 
@@ -239,17 +315,9 @@ export default function DashboardPage() {
         totalTypes,
     } = useDashboardData(tasks, selectedStatus, selectedType);
 
-    // ── Transform barData to In Process / Remaining format ──
-    const barChartData = barData.map((d) => ({
-        label: d.label,
-        total: d.total,
-        inProcess: d.statusCounts['In Process'] || 0,
-    }));
-
     // ── Handlers ─────────────────────────────────────────
-    const handleDonutClick = useCallback((label: string) => {
+    const handleStatusClick = useCallback((label: string) => {
         setSelectedStatus((prev) => (prev === label ? null : label));
-        setSelectedType(null);
     }, []);
 
     const handleBarClick = useCallback((label: string) => {
@@ -277,17 +345,47 @@ export default function DashboardPage() {
 
     // ── Dashboard content (shared between desktop & mobile) ──
     const dashboardContent = (
-        <div className="min-h-screen" style={{ backgroundColor: 'var(--background)' }}>
+        <div className="flex flex-col min-h-screen" style={{ backgroundColor: 'var(--background)' }}>
+            {/* Mobile App Header — gradient background */}
+            {isMobile && (
+                <div
+                    className="px-4 py-3 flex items-center shadow-sm relative z-20 shrink-0"
+                    style={{ background: 'linear-gradient(135deg, var(--primary) 0%, var(--primary-hover) 100%)' }}
+                >
+                    <button
+                        onClick={() => setMobileMenuOpen(true)}
+                        className="flex items-center justify-center w-9 h-9 rounded-lg transition-colors hover:bg-white/10 active:bg-white/20 mr-3"
+                        aria-label="Open navigation menu"
+                    >
+                        <Menu size={22} className="text-white" />
+                    </button>
+                    <h1 className="text-lg font-bold text-white tracking-wide">
+                        {t('nav.dashboard', 'Dashboard')}
+                    </h1>
+                </div>
+            )}
+
             {/* ── Header ─────────────────────────────────── */}
             <div className="px-4 pt-5 pb-3 md:px-8 md:pt-8 md:pb-5">
                 <div className="flex items-center justify-between">
-                    <div>
-                        <h1 className="text-xl md:text-2xl font-bold" style={{ color: 'var(--foreground)' }}>
-                            {t('dashboard.title')}
-                        </h1>
-                        <p className="text-sm mt-1" style={{ color: 'var(--muted-foreground)' }}>
-                            {t('dashboard.subtitle')}
-                        </p>
+                    <div className="flex items-center gap-3">
+                        {!isMobile && (
+                            <div>
+                                <h1 className="text-xl md:text-2xl font-bold" style={{ color: 'var(--foreground)' }}>
+                                    {t('dashboard.title')}
+                                </h1>
+                                <p className="text-sm mt-1" style={{ color: 'var(--muted-foreground)' }}>
+                                    {t('dashboard.subtitle')}
+                                </p>
+                            </div>
+                        )}
+                        {isMobile && (
+                            <div>
+                                <h2 className="text-lg font-bold" style={{ color: 'var(--foreground)' }}>
+                                    {t('dashboard.title')}
+                                </h2>
+                            </div>
+                        )}
                     </div>
                     {hasFilters && (
                         <button
@@ -315,7 +413,6 @@ export default function DashboardPage() {
                     </div>
                 </div>
             ) : isError ? (
-                /* ── Error State ────────────────────────────── */
                 <div className="flex items-center justify-center py-32">
                     <div className="flex flex-col items-center gap-3 text-center px-6">
                         <AlertCircle size={32} style={{ color: 'var(--destructive)' }} />
@@ -328,62 +425,30 @@ export default function DashboardPage() {
                 <div className="px-4 pb-8 md:px-8 space-y-5">
 
                     {/* ── Active filter pills ────────────────── */}
-                    <AnimatePresence>
-                        {hasFilters && (
-                            <motion.div
-                                initial={{ opacity: 0, height: 0 }}
-                                animate={{ opacity: 1, height: 'auto' }}
-                                exit={{ opacity: 0, height: 0 }}
-                                className="flex items-center gap-2 flex-wrap"
-                            >
-                                <ListFilter size={14} style={{ color: 'var(--muted-foreground)' }} />
-                                {selectedStatus && (
-                                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold"
-                                        style={{ backgroundColor: 'var(--info-bg)', color: 'var(--info)', border: '1px solid var(--info)' }}>
-                                        {t('dashboard.filters.status', { status: selectedStatus })}
-                                        <X size={10} className="cursor-pointer ml-0.5" onClick={() => { setSelectedStatus(null); setSelectedType(null); }} />
-                                    </span>
-                                )}
-                                {selectedType && (
-                                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold"
-                                        style={{ backgroundColor: 'var(--warning-bg)', color: 'var(--warning)', border: '1px solid var(--warning)' }}>
-                                        {t('dashboard.filters.type', { type: selectedType })}
-                                        <X size={10} className="cursor-pointer ml-0.5" onClick={() => setSelectedType(null)} />
-                                    </span>
-                                )}
-                            </motion.div>
-                        )}
-                    </AnimatePresence>
+                    {hasFilters && (
+                        <div className="flex items-center gap-2 flex-wrap min-h-[32px]">
+                            <ListFilter size={14} style={{ color: 'var(--muted-foreground)' }} />
+                            {selectedStatus && (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold"
+                                    style={{
+                                        backgroundColor: `${STATUS_COLORS[selectedStatus]}15`,
+                                        color: STATUS_COLORS[selectedStatus],
+                                        border: `1px solid ${STATUS_COLORS[selectedStatus]}`,
+                                    }}>
+                                    {t('dashboard.filters.status', { status: selectedStatus })}
+                                    <X size={10} className="cursor-pointer ml-0.5" onClick={() => setSelectedStatus(null)} />
+                                </span>
+                            )}
+                            {selectedType && (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold"
+                                    style={{ backgroundColor: 'var(--warning-bg)', color: 'var(--warning)', border: '1px solid var(--warning)' }}>
+                                    {t('dashboard.filters.type', { type: selectedType })}
+                                    <X size={10} className="cursor-pointer ml-0.5" onClick={() => setSelectedType(null)} />
+                                </span>
+                            )}
+                        </div>
+                    )}
 
-                    {/* ── Stat Cards ─────────────────────────── */}
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                        {[
-                            { icon: Layers, label: t('dashboard.statCards.totalTasks'), value: totalTasks, color: 'var(--primary)' },
-                            { icon: CircleCheck, label: t('dashboard.statCards.ready'), value: donutSegments.find((s) => s.label === 'Ready')?.value ?? 0, color: STATUS_COLORS['Ready'] },
-                            { icon: Clock, label: t('dashboard.statCards.inProcess'), value: donutSegments.find((s) => s.label === 'In Process')?.value ?? 0, color: STATUS_COLORS['In Process'] },
-                            { icon: BadgeCheck, label: t('dashboard.statCards.approved'), value: donutSegments.find((s) => s.label === 'Approved')?.value ?? 0, color: STATUS_COLORS['Approved'] },
-                        ].map((card) => (
-                            <motion.div
-                                key={card.label}
-                                initial={{ opacity: 0, y: 12 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                transition={{ duration: 0.3 }}
-                                className="p-4 md:p-5"
-                                style={cardStyle}
-                            >
-                                <div className="flex items-center gap-2 mb-2">
-                                    <div className="w-8 h-8 rounded-lg flex items-center justify-center"
-                                        style={{ backgroundColor: `${card.color}15` }}>
-                                        <card.icon size={16} style={{ color: card.color }} />
-                                    </div>
-                                </div>
-                                <p className="text-2xl md:text-3xl font-extrabold" style={{ color: 'var(--foreground)' }}>{card.value}</p>
-                                <p className="text-[11px] md:text-xs font-semibold mt-1 tracking-wider" style={{ color: 'var(--muted-foreground)' }}>
-                                    {card.label.toUpperCase()}
-                                </p>
-                            </motion.div>
-                        ))}
-                    </div>
 
                     {/* ── Main charts: 2-col desktop, stacked mobile ── */}
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 lg:gap-6">
@@ -406,7 +471,7 @@ export default function DashboardPage() {
                                     size={180}
                                     strokeWidth={22}
                                     selectedLabel={selectedStatus}
-                                    onSegmentClick={handleDonutClick}
+                                    onSegmentClick={handleStatusClick}
                                     centerLabel={t('dashboard.charts.tasks')}
                                 />
                                 {/* Legend */}
@@ -417,7 +482,7 @@ export default function DashboardPage() {
                                             <button
                                                 key={seg.label}
                                                 type="button"
-                                                onClick={() => handleDonutClick(seg.label)}
+                                                onClick={() => handleStatusClick(seg.label)}
                                                 className="flex items-center justify-between w-full px-3 py-2.5 rounded-lg transition-all duration-200"
                                                 style={{
                                                     backgroundColor: isSelected ? `${seg.color}15` : 'transparent',
@@ -442,7 +507,7 @@ export default function DashboardPage() {
                             </div>
                         </motion.div>
 
-                        {/* ─── Chart 2: Bar chart (1 col) ─────── */}
+                        {/* ─── Chart 2: Stacked Bar chart (1 col) ─────── */}
                         <motion.div
                             initial={{ opacity: 0, y: 16 }}
                             animate={{ opacity: 1, y: 0 }}
@@ -456,28 +521,57 @@ export default function DashboardPage() {
                                     {t('dashboard.charts.tasksByType')}
                                 </h3>
                                 <p className="text-xs md:text-sm mt-1" style={{ color: 'var(--muted-foreground)' }}>
-                                    {selectedStatus ? t('dashboard.charts.filteredBy', { filter: selectedStatus }) : t('dashboard.charts.groupedByTaskType')}
+                                    {selectedStatus
+                                        ? t('dashboard.charts.filteredBy', { filter: selectedStatus })
+                                        : t('dashboard.charts.groupedByTaskType')}
                                 </p>
                             </div>
 
-                            <div className="px-5 pb-5 md:px-6 md:pb-6">
-                                <HorizontalBarChart
-                                    data={barChartData}
-                                    selectedLabel={selectedType}
+                            {/* Chart area — generous padding on mobile */}
+                            <div className="px-2 pb-2 md:px-6 md:pb-6">
+                                <StackedBarChart
+                                    data={barData}
+                                    selectedTypeLabel={selectedType}
+                                    selectedStatus={selectedStatus}
                                     onBarClick={handleBarClick}
+                                    onStatusClick={handleStatusClick}
+                                    isMobile={isMobile}
                                 />
                             </div>
 
-                            {/* Bottom legend */}
-                            <div className="px-5 pb-4 md:px-6 md:pb-5 flex items-center gap-6 border-t" style={{ borderColor: 'var(--border)' }}>
-                                <div className="flex items-center gap-2 pt-3">
-                                    <span className="w-3.5 h-3.5 rounded-sm" style={{ backgroundColor: STATUS_COLORS['In Process'] }} />
-                                    <span className="text-xs md:text-sm font-semibold" style={{ color: 'var(--foreground)' }}>{t('dashboard.charts.inProcess')}</span>
-                                </div>
-                                <div className="flex items-center gap-2 pt-3">
-                                    <span className="w-3.5 h-3.5 rounded-sm" style={{ backgroundColor: '#d1d5db' }} />
-                                    <span className="text-xs md:text-sm font-semibold" style={{ color: 'var(--foreground)' }}>{t('dashboard.charts.remaining')}</span>
-                                </div>
+                            {/* Bottom legend: 3 status labels */}
+                            <div className="px-5 pb-4 md:px-6 md:pb-5 flex items-center gap-4 md:gap-6 border-t" style={{ borderColor: 'var(--border)' }}>
+                                {STATUS_LABELS.map((status) => {
+                                    const isActive = selectedStatus === status;
+                                    const isFiltered = selectedStatus != null && !isActive;
+                                    return (
+                                        <button
+                                            key={status}
+                                            type="button"
+                                            onClick={() => handleStatusClick(status)}
+                                            className="flex items-center gap-1.5 md:gap-2 pt-3 transition-opacity"
+                                            style={{ opacity: isFiltered ? 0.35 : 1 }}
+                                        >
+                                            <span
+                                                className="w-3 h-3 md:w-3.5 md:h-3.5 rounded-sm shrink-0"
+                                                style={{
+                                                    backgroundColor: STATUS_COLORS[status],
+                                                    outline: isActive ? `2px solid ${STATUS_COLORS[status]}` : 'none',
+                                                    outlineOffset: '2px',
+                                                }}
+                                            />
+                                            <span
+                                                className="text-[11px] md:text-sm"
+                                                style={{
+                                                    color: isActive ? STATUS_COLORS[status] : 'var(--foreground)',
+                                                    fontWeight: isActive ? 700 : 600,
+                                                }}
+                                            >
+                                                {status}
+                                            </span>
+                                        </button>
+                                    );
+                                })}
                             </div>
                         </motion.div>
                     </div>
@@ -507,56 +601,96 @@ export default function DashboardPage() {
                             </div>
                         </div>
 
-                        <div className="overflow-x-auto">
-                            <table className="w-full min-w-[600px]">
-                                <thead>
-                                    <tr style={{ backgroundColor: 'var(--muted)', borderBottom: '1px solid var(--border)' }}>
-                                        <th className="text-left px-5 py-3 text-[11px] md:text-xs font-bold tracking-wider" style={{ color: 'var(--muted-foreground)' }}>{t('dashboard.table.rowNumber')}</th>
-                                        <th className="text-left px-5 py-3 text-[11px] md:text-xs font-bold tracking-wider" style={{ color: 'var(--muted-foreground)' }}>{t('dashboard.table.type')}</th>
-                                        <th className="text-left px-5 py-3 text-[11px] md:text-xs font-bold tracking-wider" style={{ color: 'var(--muted-foreground)' }}>{t('dashboard.table.docNumber')}</th>
-                                        <th className="text-left px-5 py-3 text-[11px] md:text-xs font-bold tracking-wider" style={{ color: 'var(--muted-foreground)' }}>{t('dashboard.table.status')}</th>
-                                        <th className="text-right px-5 py-3 text-[11px] md:text-xs font-bold tracking-wider" style={{ color: 'var(--muted-foreground)' }}>{t('dashboard.table.amount')}</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {tableRows.length === 0 ? (
-                                        <tr>
-                                            <td colSpan={5} className="text-center py-10 text-sm" style={{ color: 'var(--muted-foreground)' }}>
-                                                {t('dashboard.charts.noTasksFound')}
-                                            </td>
-                                        </tr>
-                                    ) : tableRows.map((row, idx) => {
-                                        const statusColor = STATUS_COLORS[row.status] || 'var(--muted-foreground)';
-                                        return (
-                                            <tr
-                                                key={`${row.docNumber}-${idx}`}
-                                                className="transition-colors"
-                                                style={{ borderBottom: '1px solid var(--border)' }}
-                                                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--muted)')}
-                                                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
-                                            >
-                                                <td className="px-5 py-3.5 text-xs md:text-sm font-semibold" style={{ color: 'var(--muted-foreground)' }}>
-                                                    {idx + 1}
-                                                </td>
-                                                <td className="px-5 py-3.5 text-xs md:text-sm font-semibold" style={{ color: 'var(--foreground)' }}>
-                                                    {row.documentTypeDesc}
-                                                </td>
-                                                <td className="px-5 py-3.5 text-xs md:text-sm font-bold" style={{ color: 'var(--primary)' }}>
+                        <div
+                            className="overflow-auto rounded-b-[14px]"
+                            style={{
+                                maxHeight: '400px',
+                                scrollbarWidth: 'thin',
+                                scrollbarColor: '#9ca3af transparent',
+                            }}
+                        >
+                            {tableRows.length === 0 ? (
+                                <div className="text-center py-10 text-sm text-muted-foreground border-t border-border">
+                                    {t('dashboard.charts.noTasksFound', 'No tasks found')}
+                                </div>
+                            ) : isMobile ? (
+                                <div className="flex flex-col border-t border-border divide-y divide-border">
+                                    {tableRows.map((row, idx) => (
+                                        <div key={`${row.docNumber}-${idx}`} className="flex relative items-center p-4 hover:bg-muted/50 transition-colors">
+                                            {/* Left - Index */}
+                                            <div className="w-[32px] text-xs font-bold text-muted-foreground shrink-0 mt-0.5">
+                                                {idx + 1}
+                                            </div>
+
+                                            {/* Middle - Doc Number & Type */}
+                                            <div className="flex-1 min-w-0 pr-4">
+                                                <p className="text-sm font-bold text-slate-900 truncate" style={{ color: 'var(--foreground)' }}>
                                                     {row.docNumber}
-                                                </td>
-                                                <td className="px-5 py-3.5">
+                                                </p>
+                                                <p className="text-xs text-slate-500 mt-1 truncate" style={{ color: 'var(--muted-foreground)' }}>
+                                                    {row.documentTypeDesc || row.taskType}
+                                                </p>
+                                            </div>
+
+                                            {/* Right - Amount & Status */}
+                                            <div className="flex flex-col items-end pr-5 shrink-0 space-y-1.5">
+                                                {row.totalNetAmount != null ? (
+                                                    <p className="text-sm font-bold truncate tabular-nums text-foreground">
+                                                        {row.totalNetAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {row.displayCurrency}
+                                                    </p>
+                                                ) : (
+                                                    <p className="text-sm font-bold truncate text-muted-foreground">—</p>
+                                                )}
+                                                <div>
                                                     <StatusBadge status={row.status} />
-                                                </td>
-                                                <td className="px-5 py-3.5 text-xs md:text-sm font-bold text-right tabular-nums" style={{ color: 'var(--foreground)' }}>
+                                                </div>
+                                            </div>
+
+                                            {/* Chevron */}
+                                            <ChevronRight className="absolute right-4 w-4 h-4 text-slate-300" />
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <Table className="min-w-[640px]">
+                                    <TableHeader className="sticky top-0 z-10 bg-muted">
+                                        <TableRow className="hover:bg-muted border-b">
+                                            <TableHead className="px-5 py-3 text-[11px] md:text-xs font-bold tracking-wider text-muted-foreground w-[60px]">
+                                                {t('dashboard.table.rowNumber')}
+                                            </TableHead>
+                                            <TableHead className="px-5 py-3 text-[11px] md:text-xs font-bold tracking-wider text-muted-foreground">
+                                                {t('dashboard.table.docNumber')}
+                                            </TableHead>
+                                            <TableHead className="px-5 py-3 text-[11px] md:text-xs font-bold tracking-wider text-muted-foreground">
+                                                {t('dashboard.table.status')}
+                                            </TableHead>
+                                            <TableHead className="px-5 py-3 text-[11px] md:text-xs font-bold tracking-wider text-muted-foreground text-right">
+                                                {t('dashboard.table.amount')}
+                                            </TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {tableRows.map((row, idx) => (
+                                            <TableRow key={`${row.docNumber}-${idx}`}>
+                                                <TableCell className="px-5 py-3.5 text-xs md:text-sm font-semibold text-muted-foreground">
+                                                    {idx + 1}
+                                                </TableCell>
+                                                <TableCell className="px-5 py-3.5 text-xs md:text-sm font-bold text-primary">
+                                                    {row.docNumber}
+                                                </TableCell>
+                                                <TableCell className="px-5 py-3.5">
+                                                    <StatusBadge status={row.status} />
+                                                </TableCell>
+                                                <TableCell className="px-5 py-3.5 text-xs md:text-sm font-bold text-right tabular-nums text-foreground">
                                                     {row.totalNetAmount != null
                                                         ? `${row.totalNetAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${row.displayCurrency}`
                                                         : '—'}
-                                                </td>
-                                            </tr>
-                                        );
-                                    })}
-                                </tbody>
-                            </table>
+                                                </TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            )}
                         </div>
                     </motion.div>
                 </div>
@@ -564,12 +698,14 @@ export default function DashboardPage() {
         </div>
     );
 
-    // ── Layout: sidebar on desktop, floating bar on mobile ──
+    // ── Layout: hamburger sidebar on mobile, desktop sidebar ──
     if (isMobile) {
         return (
             <div className="relative h-screen overflow-auto bg-background">
                 {dashboardContent}
-                <TaskScopeFloatingBar
+                <MobileSidebarSheet
+                    isOpen={mobileMenuOpen}
+                    onClose={() => setMobileMenuOpen(false)}
                     scope="my"
                     onScopeChange={handleScopeChange}
                 />

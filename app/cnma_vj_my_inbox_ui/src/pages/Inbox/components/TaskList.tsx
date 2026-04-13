@@ -35,6 +35,7 @@ import { cn } from '@/lib/utils';
 import { FilterBar } from '@/components/filterbar';
 import { useTaskSelection } from '@/pages/Inbox/hooks/useTaskSelection';
 import { useTaskFilters } from '@/pages/Inbox/hooks/useTaskFilters';
+import { useTranslation } from 'react-i18next';
 
 
 interface TaskListProps {
@@ -109,11 +110,13 @@ export function TaskList({
     const pageEnd = totalItems === 0 ? 0 : Math.min(currentPage * pageSize + tasks.length, totalItems);
     const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
 
+    const { t } = useTranslation();
+
     const selectionSummary = showTaskActions && selection.selectionMode
-        ? `${selection.selectedIds.size} selected`
+        ? t('inbox.selectedCount', { count: selection.selectedIds.size, defaultValue: `${selection.selectedIds.size} selected` })
         : filters.hasLocalFilter
-            ? `Showing ${filters.filteredTasks.length} of ${tasks.length} on this page`
-            : `Showing ${pageStart}-${pageEnd} of ${totalItems}`;
+            ? t('inbox.filteredSummary', { count: filters.filteredTasks.length, total: tasks.length, defaultValue: `Showing ${filters.filteredTasks.length} of ${tasks.length} on this page` })
+            : t('inbox.paginationSummary', { start: pageStart, end: pageEnd, total: totalItems, defaultValue: `Showing ${pageStart}-${pageEnd} of ${totalItems}` });
 
     // ─── Loading skeleton ──────────────────────────────────
     if (isLoading) {
@@ -319,10 +322,11 @@ function DesktopHeader({
     isRefreshing: boolean;
     onToggleCollapse?: () => void;
 }) {
+    const { t } = useTranslation();
     return (
         <div className="flex items-center justify-between px-3 py-3">
             <div className="flex items-center gap-2">
-                <h2 className="text-[15px] font-semibold text-slate-800">All Tasks</h2>
+                <h2 className="text-[15px] font-semibold text-slate-800">{t('dashboard.charts.allTasks', 'All Tasks')}</h2>
                 <span className="rounded-md bg-slate-200/80 px-2 py-0.5 text-[11px] font-semibold text-slate-700">
                     {totalItems}
                 </span>
@@ -334,7 +338,7 @@ function DesktopHeader({
                         size="icon"
                         onClick={() => (selectionMode ? exitSelectionMode() : enterSelectionMode())}
                         className="h-8 w-8 rounded-lg hover:bg-slate-100"
-                        title={selectionMode ? 'Exit selection' : 'Select tasks'}
+                        title={selectionMode ? t('common.cancel', 'Exit selection') : t('inbox.select', 'Select tasks')}
                     >
                         {selectionMode ? <X className="size-4" /> : <ListChecks className="size-4" />}
                     </Button>
@@ -345,7 +349,7 @@ function DesktopHeader({
                     onClick={() => onRefresh?.()}
                     disabled={isRefreshing}
                     className="h-8 w-8 rounded-lg hover:bg-slate-100"
-                    title="Refresh"
+                    title={t('common.refresh', 'Refresh')}
                 >
                     <RefreshCw className={`size-4 ${isRefreshing ? 'animate-spin' : ''}`} />
                 </Button>
@@ -355,7 +359,7 @@ function DesktopHeader({
                         size="icon"
                         onClick={onToggleCollapse}
                         className="h-8 w-8 rounded-lg hover:bg-slate-100"
-                        title="Collapse sidebar"
+                        title={t('nav.collapseSidebar', 'Collapse sidebar')}
                     >
                         <PanelLeftClose className="size-4" />
                     </Button>
@@ -376,6 +380,7 @@ function ScopeTabs({
     myTasksCount: number;
     approvedTasksCount: number;
 }) {
+    const { t } = useTranslation();
     return (
         <div className="px-0 pb-3">
             <Tabs
@@ -393,7 +398,7 @@ function ScopeTabs({
                             'data-[state=active]:bg-transparent data-[state=active]:shadow-none'
                         )}
                     >
-                        My Tasks
+                        {t('nav.myTasks', 'My Tasks')}
                         <span className="ml-1.5 flex h-[18px] min-w-[20px] items-center justify-center rounded-full px-1.5 text-[11px] font-bold bg-slate-100 text-slate-600 data-[state=active]:bg-primary/10 data-[state=active]:text-primary">
                             {myTasksCount}
                         </span>
@@ -407,7 +412,7 @@ function ScopeTabs({
                             'data-[state=active]:bg-transparent data-[state=active]:shadow-none'
                         )}
                     >
-                        Approved Tasks
+                        {t('nav.approvedTasks', 'Approved Tasks')}
                         <span className="ml-1.5 flex h-[18px] min-w-[20px] items-center justify-center rounded-full px-1.5 text-[11px] font-bold bg-slate-100 text-slate-600 data-[state=active]:bg-primary/10 data-[state=active]:text-primary">
                             {approvedTasksCount}
                         </span>
@@ -457,11 +462,12 @@ function MobileHeader({
     enterSelectionMode: () => void;
     showTaskActions: boolean;
 }) {
+    const { t } = useTranslation();
     return (
         <div className="border-b-0 bg-transparent backdrop-blur-none">
             <div className="flex items-center justify-between px-4 py-3">
                 <div className="flex items-center gap-2">
-                    <h2 className="text-[17px] font-bold text-slate-800">All Tasks</h2>
+                    <h2 className="text-[17px] font-bold text-slate-800">{t('dashboard.charts.allTasks', 'All Tasks')}</h2>
                     <span className="rounded-md bg-slate-200/80 px-2 py-0.5 text-[11px] font-bold text-slate-700">
                         {totalItems}
                     </span>
@@ -484,7 +490,7 @@ function MobileHeader({
                                     'data-[state=active]:bg-transparent data-[state=active]:shadow-none'
                                 )}
                             >
-                                My Tasks
+                                {t('nav.myTasks', 'My Tasks')}
                                 <span className="ml-1.5 flex h-[18px] min-w-[20px] items-center justify-center rounded-full px-1.5 text-[11px] font-bold bg-slate-100 text-slate-600 data-[state=active]:bg-primary/10 data-[state=active]:text-primary">
                                     {myTasksCount}
                                 </span>
@@ -497,7 +503,7 @@ function MobileHeader({
                                     'data-[state=active]:bg-transparent data-[state=active]:shadow-none'
                                 )}
                             >
-                                Approved Tasks
+                                {t('nav.approvedTasks', 'Approved Tasks')}
                                 <span className="ml-1.5 flex h-[18px] min-w-[20px] items-center justify-center rounded-full px-1.5 text-[11px] font-bold bg-slate-100 text-slate-600 data-[state=active]:bg-primary/10 data-[state=active]:text-primary">
                                     {approvedTasksCount}
                                 </span>
@@ -510,7 +516,7 @@ function MobileHeader({
                     <Search className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
                     <Input
                         id="inbox-search"
-                        placeholder="Search tasks..."
+                        placeholder={t('inbox.searchTasks', 'Search tasks...')}
                         value={filterValues.search || ''}
                         onChange={(e) => {
                             const val = e.target.value;
@@ -544,7 +550,7 @@ function MobileHeader({
                             className="h-10 rounded-xl border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 shadow-sm"
                         >
                             <Filter className="mr-2 size-4" />
-                            Filter
+                            {t('common.filter', 'Filter')}
                             {mobileActiveFilterCount > 0 && (
                                 <span className="ml-2 rounded-full bg-primary px-1.5 py-0 text-[10px] font-semibold text-white">
                                     {mobileActiveFilterCount}
@@ -565,12 +571,12 @@ function MobileHeader({
                                 {selectionMode ? (
                                     <>
                                         <X className="mr-2 size-4" />
-                                        Cancel
+                                        {t('common.cancel', 'Cancel')}
                                     </>
                                 ) : (
                                     <>
                                         <ListChecks className="mr-2 size-4" />
-                                        Select
+                                        {t('inbox.select', 'Select')}
                                     </>
                                 )}
                             </Button>
@@ -591,10 +597,11 @@ function EmptyState({
     hasSearch: boolean;
     hasFilters: boolean;
 }) {
-    const message = hasSearch || hasFilters ? 'No matching tasks' : 'Inbox is empty';
+    const { t } = useTranslation();
+    const message = hasSearch || hasFilters ? t('inbox.noMatchingTasks', 'No matching tasks') : t('inbox.inboxEmpty', 'Inbox is empty');
     const sub = hasSearch || hasFilters
-        ? 'Try adjusting your search or filter criteria.'
-        : 'No pending tasks assigned to you.';
+        ? t('inbox.tryAdjusting', 'Try adjusting your search or filter criteria.')
+        : t('inbox.noPendingTasks', 'No pending tasks assigned to you.');
 
     return (
         <div className="flex flex-col items-center justify-center px-6 py-16 text-center">

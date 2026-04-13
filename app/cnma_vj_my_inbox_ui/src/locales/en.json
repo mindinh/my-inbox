@@ -40,9 +40,24 @@
         "clearFilters": "Clear Filters"
     },
     "nav": {
+        "home": "Home",
         "dashboard": "Dashboard",
         "myInbox": "My Inbox",
+        "myTasks": "My Tasks",
+        "approvedTasks": "Approved Tasks",
         "substitutionInbox": "Substitution Inbox"
+    },
+    "home": {
+        "welcomeBack": "Welcome back",
+        "pendingApprovals": "{{count}} pending approvals",
+        "allCaughtUp": "All caught up! No pending approvals",
+        "totalTasks": "Total Tasks",
+        "inApproval": "In Approval",
+        "rejected": "Rejected",
+        "newestTasks": "Newest Tasks",
+        "viewAll": "View All",
+        "noTasks": "No pending tasks. You're all caught up!",
+        "quickAccess": "Quick Access"
     },
     "dashboard": {
         "title": "Dashboard",
@@ -54,9 +69,9 @@
         "statCards": {
             "totalTasks": "Total Tasks",
             "taskTypes": "Task Types",
-            "ready": "Ready",
-            "inProcess": "In Process",
-            "approved": "Approved"
+            "new": "New",
+            "approved": "Approved",
+            "rejected": "Rejected"
         },
         "charts": {
             "tasksByStatus": "TASKS BY STATUS",
@@ -66,9 +81,7 @@
             "groupedByTaskType": "Grouped by task type",
             "filteredBy": "Filtered by: {{filter}}",
             "allTasks": "All tasks",
-            "noTasksFound": "No tasks found",
-            "inProcess": "In Process",
-            "remaining": "Remaining"
+            "noTasksFound": "No tasks found"
         },
         "table": {
             "rowNumber": "#",
@@ -79,7 +92,8 @@
         },
         "filters": {
             "status": "Status: {{status}}",
-            "type": "Type: {{type}}"
+            "type": "Type: {{type}}",
+            "barStatus": "Bar Status: {{status}}"
         },
         "itemsCount": "{{count}} items"
     },
@@ -98,7 +112,7 @@
     },
     "task": {
         "information": "Information",
-        "approvalTree": "Approval Tree",
+        "approvalTree": "Workflow",
         "comments": "Comments",
         "attachments": "Attachments",
         "history": "History",
@@ -141,8 +155,10 @@
         "massRejectSuccess": "{{count}} tasks rejected successfully"
     },
     "status": {
-        "ready": "Ready",
-        "inProcess": "In Process",
+        "new": "New",
+        "ready": "New",
+        "reserved": "New",
+        "inProcess": "New",
         "approved": "Approved",
         "rejected": "Rejected",
         "completed": "Completed",

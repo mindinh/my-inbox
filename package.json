@@ -125,6 +125,7 @@
   "devDependencies": {
     "@cap-js/cds-types": "^0.15.0",
     "@eslint/js": "^9.0.0",
+    "@sap/cds-dk": "^9.8.4",
     "@types/express": "^5.0.6",
     "@types/node": "^25.0.1",
     "@types/passport": "^1.0.17",
