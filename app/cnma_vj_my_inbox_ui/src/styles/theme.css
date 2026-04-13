@@ -16,16 +16,17 @@
    --font-weight-bold: 700;
 
    /* ─────────────────────────────────────────
-     BRAND COLORS (SAP UI5 Launchpad)
+     BRAND COLORS (Deep Red — matches reference app)
      ───────────────────────────────────────── */
-   --color-brand: #b10e10;
-   --color-brand-hover: #990c0e;
-   --color-link: #820a0c;
+   --color-brand: #cc0000;
+   --color-brand-hover: #990000;
+   --color-brand-dark: #7a0000;
+   --color-link: #990000;
 
    /* ─────────────────────────────────────────
      CORE PALETTE (Light Mode - SAP UI5)
      ───────────────────────────────────────── */
-   --background: #f7f9fc;
+   --background: #f0f2f5;
    --foreground: #32363a;
    --card: #ffffff;
    --card-foreground: #32363a;

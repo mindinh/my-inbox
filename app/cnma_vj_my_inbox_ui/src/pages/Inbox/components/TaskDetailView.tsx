@@ -22,6 +22,7 @@ import {
     makeTabDefinitions,
 } from './TaskDetailPanels';
 import { resolveBusinessSectionModel } from './TaskDetailSections.registry';
+import { useTranslation } from 'react-i18next';
 
 interface TaskDetailViewProps {
     detail: TaskDetailType | undefined;
@@ -56,6 +57,7 @@ export function TaskDetailView({
     });
     // Track direction for mobile tab animation
     const prevTabIndexRef = useRef(0);
+    const { t } = useTranslation();
 
     const queryClient = useQueryClient();
     const handleCommentAdded = useCallback(() => {
@@ -87,10 +89,11 @@ export function TaskDetailView({
                 ? makeTabDefinitions(
                     detail,
                     workflowQuery.data?.steps?.length || 0,
-                    workflowQuery.data?.comments
+                    workflowQuery.data?.comments,
+                    t
                 )
                 : [],
-        [detail, workflowQuery.data?.steps?.length, workflowQuery.data?.comments]
+        [detail, workflowQuery.data?.steps?.length, workflowQuery.data?.comments, t]
     );
 
     if (isLoading) {
@@ -102,7 +105,7 @@ export function TaskDetailView({
             <div className="flex flex-col items-center justify-center h-full text-center p-8">
                 <FileText className="size-12 text-muted-foreground/30 mb-4" />
                 <h3 className="text-sm font-medium text-muted-foreground">
-                    Select a task to view details
+                    {t('inbox.noTasks', 'Select a task to view details')}
                 </h3>
             </div>
         );
@@ -125,12 +128,12 @@ export function TaskDetailView({
                 );
             case 'attachments':
                 if (isSecondaryLoading && detail.attachments.length === 0) {
-                    return <SecondaryTabSkeleton message="Loading attachments..." />;
+                    return <SecondaryTabSkeleton message={t('task.loadingAttachments', 'Loading attachments...')} />;
                 }
                 return <AttachmentsPanel detail={detail} isMobile={mobile} allowUpload={showActionPanel} />;
             case 'comments':
                 if (isSecondaryLoading && detail.comments.length === 0) {
-                    return <SecondaryTabSkeleton message="Loading comments..." />;
+                    return <SecondaryTabSkeleton message={t('task.loadingComments', 'Loading comments...')} />;
                 }
                 return (
                     <CommentsPanel
@@ -153,7 +156,7 @@ export function TaskDetailView({
                     detail.processingLogs.length === 0 &&
                     detail.workflowLogs.length === 0
                 ) {
-                    return <SecondaryTabSkeleton message="Loading activity..." />;
+                    return <SecondaryTabSkeleton message={t('task.loadingActivity', 'Loading activity...')} />;
                 }
                 return <ActivityPanel detail={detail} />;
             default:
@@ -246,14 +249,14 @@ export function TaskDetailView({
                             </TabsContent>
                             <TabsContent value="attachments" className="mt-0 w-full">
                                 {isSecondaryLoading && detail.attachments.length === 0 ? (
-                                    <SecondaryTabSkeleton message="Loading attachments..." />
+                                    <SecondaryTabSkeleton message={t('task.loadingAttachments', 'Loading attachments...')} />
                                 ) : (
                                     <AttachmentsPanel detail={detail} allowUpload={showActionPanel} />
                                 )}
                             </TabsContent>
                             <TabsContent value="comments" className="mt-0 w-full">
                                 {isSecondaryLoading && detail.comments.length === 0 ? (
-                                    <SecondaryTabSkeleton message="Loading comments..." />
+                                    <SecondaryTabSkeleton message={t('task.loadingComments', 'Loading comments...')} />
                                 ) : (
                                     <CommentsPanel
                                         detail={detail}
@@ -274,7 +277,7 @@ export function TaskDetailView({
                                 {isSecondaryLoading &&
                                     detail.processingLogs.length === 0 &&
                                     detail.workflowLogs.length === 0 ? (
-                                    <SecondaryTabSkeleton message="Loading activity..." />
+                                    <SecondaryTabSkeleton message={t('task.loadingActivity', 'Loading activity...')} />
                                 ) : (
                                     <ActivityPanel detail={detail} />
                                 )}
@@ -394,11 +397,12 @@ function TaskActionPanel({
     isApprovedScope?: boolean;
 }) {
     if (isApprovedScope) {
+        const { t } = useTranslation();
         return (
             <div className="flex w-full items-center justify-end">
                 <Button variant="outline" className="font-semibold text-slate-700" size="sm" onClick={() => { }} disabled={isExecuting}>
                     <Undo2 className="size-4 mr-1.5" />
-                    Undo
+                    {t('decision.undo', 'Undo')}
                 </Button>
             </div>
         );

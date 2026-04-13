@@ -56,6 +56,7 @@ export { CommentsPanel } from './panels/CommentsPanel';
 export { WorkflowApprovalPanel } from './panels/WorkflowApprovalPanel';
 
 import { StatusBadge, PriorityBadge } from './TaskBadges';
+import { useTranslation } from 'react-i18next';
 
 // ─── BusinessPanel ─────────────────────────────────────────
 
@@ -283,6 +284,7 @@ export function BusinessPanel({
 // ─── ActivityPanel ─────────────────────────────────────────
 
 export function ActivityPanel({ detail }: { detail: TaskDetail }) {
+    const { t } = useTranslation();
     const processingRows = detail.processingLogs.map((log, idx) => ({
         id: `proc-${log.orderId ?? idx}`,
         timestamp: formatDate(log.timestamp),
@@ -303,13 +305,13 @@ export function ActivityPanel({ detail }: { detail: TaskDetail }) {
         <div className="space-y-6">
             <Card className="gap-0 bg-card border-border/70 shadow-sm">
                 <CardHeader>
-                    <CardTitle className="text-base">Processing Log</CardTitle>
-                    <CardDescription>Actions taken on this task</CardDescription>
+                    <CardTitle className="text-base">{t('task.processingLog', 'Processing Log')}</CardTitle>
+                    <CardDescription>{t('task.actionsTaken', 'Actions taken on this task')}</CardDescription>
                 </CardHeader>
                 <CardContent>
                     <ActivityTimeline
                         rows={processingRows}
-                        emptyMessage="No processing log entries found."
+                        emptyMessage={t('task.noProcessingLog', 'No processing log entries found.')}
                         accent="processing"
                     />
                 </CardContent>
@@ -317,13 +319,13 @@ export function ActivityPanel({ detail }: { detail: TaskDetail }) {
 
             <Card className="gap-0 bg-card border-border/70 shadow-sm">
                 <CardHeader>
-                    <CardTitle className="text-base">Workflow Log</CardTitle>
-                    <CardDescription>Workflow execution history</CardDescription>
+                    <CardTitle className="text-base">{t('task.workflowLog', 'Workflow Log')}</CardTitle>
+                    <CardDescription>{t('task.workflowExecution', 'Workflow execution history')}</CardDescription>
                 </CardHeader>
                 <CardContent>
                     <ActivityTimeline
                         rows={workflowRows}
-                        emptyMessage="No workflow log entries found."
+                        emptyMessage={t('task.noWorkflowLog', 'No workflow log entries found.')}
                         accent="workflow"
                     />
                 </CardContent>
@@ -334,7 +336,7 @@ export function ActivityPanel({ detail }: { detail: TaskDetail }) {
 
 // ─── Tab Definitions ───────────────────────────────────────
 
-export function makeTabDefinitions(detail: TaskDetail, workflowCount = 0, workflowComments?: WorkflowApprovalComment[]) {
+export function makeTabDefinitions(detail: TaskDetail, workflowCount = 0, workflowComments?: WorkflowApprovalComment[], t?: any) {
     const poFacts = detail.businessContext?.po as PurchaseOrderFactsheetData | undefined;
     const poFactsCount =
         (poFacts?.items?.length || 0) +
@@ -346,18 +348,18 @@ export function makeTabDefinitions(detail: TaskDetail, workflowCount = 0, workfl
     return [
         {
             value: 'business',
-            label: 'Information',
+            label: t ? t('task.information', 'Information') : 'Information',
             icon: Tag,
             count: undefined,
         },
         {
             value: 'workflow',
-            label: 'Workflow',
+            label: t ? t('task.approvalTree', 'Workflow') : 'Workflow',
             icon: GitBranch,
             count: workflowCount,
         },
-        { value: 'attachments', label: 'Attachments', icon: Paperclip, count: detail.attachments.length },
-        { value: 'comments', label: 'Comments', icon: MessageSquare, count: mergedCommentsCount },
+        { value: 'attachments', label: t ? t('task.attachments', 'Attachments') : 'Attachments', icon: Paperclip, count: detail.attachments.length },
+        { value: 'comments', label: t ? t('task.comments', 'Comments') : 'Comments', icon: MessageSquare, count: mergedCommentsCount },
     ] as const;
 }
 

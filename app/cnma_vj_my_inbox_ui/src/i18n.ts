@@ -21,5 +21,9 @@ i18n
             caches: [],
         },
     });
+// Expose to window for local testing from browser console
+if (typeof window !== 'undefined') {
+    (window as any).i18n = i18n;
+}
 
 export default i18n;

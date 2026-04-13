@@ -5,15 +5,40 @@ import { inboxKeys } from '@/pages/Inbox/hooks/inboxKeys';
 import type { DashboardTask } from '@/services/inbox/inbox.types';
 
 // ─── Status Constants ─────────────────────────────────────
-// The backend already normalizes status to these display labels.
+// The backend normalizes status to these display labels.
 
-export const STATUS_LABELS = ['Ready', 'In Process', 'Approved'] as const;
+export const STATUS_LABELS = ['New', 'Approved', 'Rejected'] as const;
 
 export const STATUS_COLORS: Record<string, string> = {
-    'Ready': '#0070f2',       // SAP Info Blue
-    'In Process': '#e76500',  // SAP Warning Orange
+    'New': '#f27200',         // SAP Warning Orange (previously #0070f2)
     'Approved': '#30914c',    // SAP Success Green
+    'Rejected': '#bb0000',    // SAP Error Red
 };
+
+/**
+ * Client-side normalization: maps any backend status value to our 3 canonical labels.
+ * Handles both old labels (Ready, In Process) and SAP codes (READY, STARTED, etc.)
+ */
+export function normalizeDashboardStatus(raw: string): string {
+    const upper = (raw || '').toUpperCase().trim().replace(/\s+/g, '_');
+    switch (upper) {
+        case 'NEW':
+        case 'READY':
+        case 'RESERVED':
+        case 'IN_PROGRESS':
+        case 'IN_PROCESS':
+        case 'STARTED':
+            return 'New';
+        case 'APPROVED':
+        case 'COMPLETED':
+        case 'COMPLETE':
+            return 'Approved';
+        case 'REJECTED':
+            return 'Rejected';
+        default:
+            return 'New'; // Default unknown statuses to New
+    }
+}
 
 // ─── Donut Segment ────────────────────────────────────────
 export interface DonutSegment {
@@ -62,10 +87,17 @@ export function useDashboardData(
     selectedStatus: string | null,
     selectedType: string | null,
 ) {
+    // ── Normalize statuses up front ──────────────────────
+    // Maps any backend status (Ready, In Process, STARTED, etc.) to our 3 canonical labels.
+    const normalizedTasks = useMemo(() =>
+        tasks.map((t) => ({ ...t, status: normalizeDashboardStatus(t.status) })),
+        [tasks]
+    );
+
     // ── Chart 1: Donut by Status ─────────────────────────
     const donutSegments: DonutSegment[] = useMemo(() => {
         const counts: Record<string, number> = {};
-        for (const t of tasks) {
+        for (const t of normalizedTasks) {
             counts[t.status] = (counts[t.status] || 0) + 1;
         }
         return STATUS_LABELS.map((s) => ({
@@ -73,18 +105,13 @@ export function useDashboardData(
             value: counts[s] || 0,
             color: STATUS_COLORS[s],
         }));
-    }, [tasks]);
+    }, [normalizedTasks]);
 
-    // ── Filtered tasks after donut selection ──────────────
-    const statusFiltered = useMemo(() => {
-        if (!selectedStatus) return tasks;
-        return tasks.filter((t) => t.status === selectedStatus);
-    }, [tasks, selectedStatus]);
-
-    // ── Chart 2: Bar chart — tasks by document type desc ─
+    // ── Chart 2: Bar chart — ALWAYS uses all tasks (not filtered by status) ─
+    // Status selection only controls visual highlighting, not data filtering.
     const barData: BarDataItem[] = useMemo(() => {
         const groups = new Map<string, { total: number; statusCounts: Record<string, number> }>();
-        for (const t of statusFiltered) {
+        for (const t of normalizedTasks) {
             const key = t.documentTypeDesc || t.taskType;
             let g = groups.get(key);
             if (!g) {
@@ -97,9 +124,14 @@ export function useDashboardData(
         return Array.from(groups.entries())
             .map(([label, data]) => ({ label, ...data }))
             .sort((a, b) => b.total - a.total);
-    }, [statusFiltered]);
+    }, [normalizedTasks]);
 
-    // ── Further filtered after bar type selection ─────────
+    // ── Filtered tasks for table (by both status and type) ─
+    const statusFiltered = useMemo(() => {
+        if (!selectedStatus) return normalizedTasks;
+        return normalizedTasks.filter((t) => t.status === selectedStatus);
+    }, [normalizedTasks, selectedStatus]);
+
     const typeFiltered = useMemo(() => {
         if (!selectedType) return statusFiltered;
         return statusFiltered.filter(
@@ -107,7 +139,7 @@ export function useDashboardData(
         );
     }, [statusFiltered, selectedType]);
 
-    // ── Chart 3: Table rows (all filtered, no TotalValue) ─
+    // ── Chart 3: Table rows ──────────────────────────────
     const tableRows: TableRow[] = useMemo(() => {
         return typeFiltered.map((t) => ({
             taskType: t.taskType,
@@ -123,8 +155,8 @@ export function useDashboardData(
     // ── Summary counts for stat cards ────────────────────
     const totalTasks = tasks.length;
     const totalTypes = useMemo(
-        () => new Set(tasks.map((t) => t.documentTypeDesc || t.taskType)).size,
-        [tasks]
+        () => new Set(normalizedTasks.map((t) => t.documentTypeDesc || t.taskType)).size,
+        [normalizedTasks]
     );
 
     return {

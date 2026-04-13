@@ -31,10 +31,13 @@ export const PRIORITY_FALLBACK: BadgeConfig = { variant: 'outline', label: '' };
 // ─── Status Config ─────────────────────────────────────────
 
 export const STATUS_CONFIG: Record<string, BadgeConfig> = {
-    READY: { variant: 'info', label: 'Ready' },
-    RESERVED: { variant: 'secondary', label: 'Reserved' },
-    IN_PROGRESS: { variant: 'warning', label: 'In Progress' },
+    NEW: { variant: 'info', label: 'New' },
+    READY: { variant: 'info', label: 'New' },
+    RESERVED: { variant: 'info', label: 'New' },
+    IN_PROGRESS: { variant: 'info', label: 'New' },
     COMPLETED: { variant: 'success', label: 'Completed' },
+    APPROVED: { variant: 'success', label: 'Approved' },
+    REJECTED: { variant: 'destructive', label: 'Rejected' },
 };
 
 export const STATUS_FALLBACK: BadgeConfig = { variant: 'secondary', label: '' };
