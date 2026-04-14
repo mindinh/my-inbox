@@ -149,7 +149,7 @@ export default function InboxPage() {
     }, [navigate]);
 
     const handleBack = useCallback(() => {
-        navigate('/');
+        navigate('/inbox');
     }, [navigate]);
 
     const handleDecision = useCallback(
@@ -172,7 +172,7 @@ export default function InboxPage() {
                     },
                 },
                 {
-                    onSuccess: () => navigate('/'),
+                    onSuccess: () => navigate('/inbox'),
                 }
             );
         },
@@ -186,7 +186,7 @@ export default function InboxPage() {
         setSelectionMode(false);
         setSelectedIds(new Set());
         hasAutoSelected.current = false;
-        navigate('/');
+        navigate('/inbox');
     }, [scope, navigate]);
 
     const handleMassDecision = useCallback(
@@ -235,24 +235,22 @@ export default function InboxPage() {
     if (isMobile) {
         return (
             <div className="relative h-screen flex flex-col overflow-hidden bg-background">
-                {/* Mobile App Header — gradient background */}
-                {!selectedTaskId && !selectionMode && (
-                    <div
-                        className="px-4 py-3 flex items-center shadow-sm relative z-20 shrink-0"
-                        style={{ background: 'linear-gradient(135deg, var(--primary) 0%, var(--primary-hover) 100%)' }}
+                {/* Mobile App Header — always visible gradient bar */}
+                <div
+                    className="px-4 py-3 flex items-center shadow-sm relative z-20 shrink-0"
+                    style={{ background: 'linear-gradient(135deg, var(--primary) 0%, var(--primary-hover) 100%)' }}
+                >
+                    <button
+                        onClick={() => setMobileMenuOpen(true)}
+                        className="flex items-center justify-center w-9 h-9 rounded-lg transition-colors hover:bg-white/10 active:bg-white/20 absolute left-4"
+                        aria-label="Open navigation menu"
                     >
-                        <button
-                            onClick={() => setMobileMenuOpen(true)}
-                            className="flex items-center justify-center w-9 h-9 rounded-lg transition-colors hover:bg-white/10 active:bg-white/20 absolute left-4"
-                            aria-label="Open navigation menu"
-                        >
-                            <Menu size={22} className="text-white" />
-                        </button>
-                        <h1 className="text-lg font-bold text-white tracking-wide w-full text-center">
-                            {scope === 'approved' ? t('nav.approvedTasks', 'Approved Tasks') : t('nav.myTasks', 'My Tasks')}
-                        </h1>
-                    </div>
-                )}
+                        <Menu size={22} className="text-white" />
+                    </button>
+                    <h1 className="text-lg font-bold text-white tracking-wide w-full text-center">
+                        {scope === 'approved' ? t('nav.approvedTasks', 'Approved Tasks') : t('nav.myTasks', 'My Tasks')}
+                    </h1>
+                </div>
                 <div className="relative flex-1 min-h-0">
                     <AnimatePresence mode="wait">
                         {selectedTaskId ? (

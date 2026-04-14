@@ -12,6 +12,7 @@ import { formatRelative } from '@/pages/Inbox/utils/formatters';
 import { mergeAndDeduplicateComments } from '@/pages/Inbox/mappers/comments.mapper';
 import { Empty } from './shared';
 import { formatDate, formatDateTime } from '@/utils/formatters/date';
+import { cn } from '@/lib/utils';
 
 export function CommentsPanel({
     detail,
@@ -62,59 +63,73 @@ export function CommentsPanel({
     };
 
     return (
-        <Card className="gap-0 bg-card border-border/70 shadow-sm">
-            <CardHeader>
-                <CardTitle className="text-base">Comments</CardTitle>
-                <CardDescription>Discussion and notes for this task</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-
+        <div className="bg-white rounded-none sm:rounded-xl shadow-none sm:shadow-sm overflow-hidden flex flex-col">
+            <div className="px-5 py-4 border-b border-slate-100 flex items-center gap-2 text-slate-800">
+                <MessageSquare className="size-5 text-slate-600" />
+                <h3 className="text-base font-semibold">Comments</h3>
+            </div>
+            
+            <div className="p-5 flex flex-col space-y-6">
                 {/* Comment list */}
                 {isLoadingWorkflowComments && (
-                    <div className="text-xs text-muted-foreground">Loading workflow comments...</div>
+                    <div className="py-4 text-center text-sm text-muted-foreground">Loading comments...</div>
                 )}
                 {merged.length === 0 && !isLoadingWorkflowComments && (
-                    <Empty message="No comments yet." />
-                )}
-                {merged.map((comment) => (
-                    <div
-                        key={comment.id}
-                        className="rounded-lg border border-border/60 p-3 space-y-1.5"
-                    >
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                            <User className="size-3" />
-                            <span className="font-medium text-foreground/80">{comment.createdBy}</span>
-                            <span>·</span>
-                            <span>{formatDateTime(comment.createdAt)}</span>
-                        </div>
-                        <div className="text-sm whitespace-pre-wrap">{comment.text}</div>
+                    <div className="py-8 text-center text-sm text-slate-400">
+                        No comments yet.
                     </div>
-                ))}
+                )}
+                <div className="space-y-3">
+                    {merged.map((comment) => (
+                        <div
+                            key={comment.id}
+                            className="rounded-lg border border-slate-100 p-3 space-y-1.5"
+                        >
+                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                <User className="size-3" />
+                                <span className="font-medium text-slate-700">{comment.createdBy}</span>
+                                <span>·</span>
+                                <span>{formatDateTime(comment.createdAt)}</span>
+                            </div>
+                            <div className="text-sm whitespace-pre-wrap text-slate-800">{comment.text}</div>
+                        </div>
+                    ))}
+                </div>
+
                 {/* Comment input */}
                 {allowAddComment && instanceId && (
-                    <div className="flex gap-2">
+                    <div className="flex flex-col gap-3">
                         <Textarea
-                            placeholder="Type a comment..."
+                            placeholder="Write a comment..."
                             value={commentText}
                             onChange={(e) => setCommentText(e.target.value)}
-                            rows={2}
+                            rows={3}
+                            className="resize-none bg-white border-slate-200 focus-visible:ring-slate-300"
+                            onKeyDown={(e) => {
+                                if (e.ctrlKey && e.key === 'Enter') {
+                                    handleSubmit();
+                                }
+                            }}
                         />
-                        <Button
-                            size="icon"
-                            variant="default"
-                            onClick={handleSubmit}
-                            disabled={!commentText.trim() || addCommentMutation.isPending}
-                            className="shrink-0 self-end"
-                        >
-                            {addCommentMutation.isPending ? (
-                                <Loader2 className="size-4 animate-spin" />
-                            ) : (
-                                <Send className="size-4" />
-                            )}
-                        </Button>
+                        <div className="flex items-center justify-between">
+                            <span className="text-[11px] text-slate-400">Ctrl+Enter to submit</span>
+                            <Button
+                                onClick={handleSubmit}
+                                disabled={!commentText.trim() || addCommentMutation.isPending}
+                                className={cn(
+                                    "bg-[#b31d22] hover:bg-[#98181d] text-white disabled:opacity-50",
+                                    "px-4 h-9 font-medium transition-colors"
+                                )}
+                            >
+                                {addCommentMutation.isPending && (
+                                    <Loader2 className="size-4 animate-spin mr-2" />
+                                )}
+                                Add Comment
+                            </Button>
+                        </div>
                     </div>
                 )}
-            </CardContent>
-        </Card>
+            </div>
+        </div>
     );
 }

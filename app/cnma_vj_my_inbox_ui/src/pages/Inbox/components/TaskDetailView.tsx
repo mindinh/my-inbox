@@ -124,6 +124,7 @@ export function TaskDetailView({
                         data={workflowQuery.data}
                         isLoading={workflowQuery.isLoading || workflowQuery.isFetching}
                         error={workflowError}
+                        taskDetail={detail.task}
                     />
                 );
             case 'attachments':
@@ -176,27 +177,43 @@ export function TaskDetailView({
     return (
         <div className="flex h-full min-w-0 flex-col bg-slate-50/70">
             {/* ── Header ── */}
-            <div className={cn(
-                'border-b border-border/60 bg-background',
-                isMobile ? 'px-4 py-3' : 'px-5 py-4'
-            )}>
-                <div className="flex items-start gap-3">
-                    {isMobile && (
-                        <Button variant="ghost" size="icon" onClick={onBack} className="mt-0.5 shrink-0">
-                            <ArrowLeft className="size-4" />
-                        </Button>
-                    )}
-                    <div className="min-w-0 flex-1 space-y-2">
-                        <h2 className={cn(
-                            'font-semibold text-foreground',
-                            isMobile ? 'text-base leading-snug line-clamp-2' : 'text-xl truncate'
-                        )}>
-                            {detail.task.title}
-                        </h2>
+            {isMobile ? (
+                <div className="px-4 pt-4 pb-0 bg-slate-50/70 shrink-0">
+                    <div className="rounded-t-xl bg-white border border-x-border/40 border-t-border/40 border-b-border/40 px-4 py-4 space-y-2.5 relative z-10">
+                        {/* Row 1: Doc number + priority (left) — status badge (right) */}
                         <StatusHeaderBadges detail={detail} />
+                        {/* Row 2: Back arrow + task title (large) */}
+                        <div className="flex items-start gap-1.5">
+                            <button onClick={onBack} className="shrink-0 mt-0.5 p-1 -ml-1 rounded-md hover:bg-slate-100 transition-colors">
+                                <ArrowLeft className="size-5 text-foreground" />
+                            </button>
+                            <h2 className="text-lg font-bold text-foreground leading-snug line-clamp-2 flex-1">
+                                {detail.task.title}
+                            </h2>
+                        </div>
+                        {/* Row 3: Task definition name ◆ Status */}
+                        {(detail.task.taskDefinitionName || detail.task.createdByName) && (
+                            <p className="text-sm text-muted-foreground pl-7">
+                                <span className="font-semibold text-foreground/80">{detail.task.taskDefinitionName}</span>
+                                {detail.task.taskDefinitionName && detail.task.status && (
+                                    <> <span className="text-muted-foreground/50">◆</span> <span>{detail.task.status}</span></>
+                                )}
+                            </p>
+                        )}
                     </div>
                 </div>
-            </div>
+            ) : (
+                <div className="border-b border-border/60 bg-background px-5 py-4">
+                    <div className="flex items-start gap-3">
+                        <div className="min-w-0 flex-1 space-y-2">
+                            <h2 className="text-xl font-semibold text-foreground truncate">
+                                {detail.task.title}
+                            </h2>
+                            <StatusHeaderBadges detail={detail} />
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* ── Desktop Tabs (unchanged) ── */}
             {!isMobile && (
@@ -245,6 +262,7 @@ export function TaskDetailView({
                                     data={workflowQuery.data}
                                     isLoading={workflowQuery.isLoading || workflowQuery.isFetching}
                                     error={workflowError}
+                                    taskDetail={detail.task}
                                 />
                             </TabsContent>
                             <TabsContent value="attachments" className="mt-0 w-full">
@@ -291,8 +309,9 @@ export function TaskDetailView({
             {isMobile && (
                 <>
                     {/* Scrollable tab bar */}
-                    <div className="shrink-0 border-b border-border/60 bg-white">
-                        <div className="flex overflow-x-auto no-scrollbar">
+                    <div className="px-4 pb-2 bg-slate-50/70 shrink-0">
+                        <div className="rounded-b-xl border border-x-border/40 border-b-border/40 border-t-0 bg-white shadow-[0_2px_4px_rgba(0,0,0,0.02)] overflow-hidden">
+                            <div className="flex overflow-x-auto no-scrollbar">
                             {tabs.map((tab) => {
                                 const isActive = activeTab === tab.value;
                                 return (
@@ -300,31 +319,31 @@ export function TaskDetailView({
                                         key={tab.value}
                                         onClick={() => handleMobileTabChange(tab.value)}
                                         className={cn(
-                                            'relative shrink-0 flex items-center gap-1.5 px-4 py-3 text-sm font-medium transition-colors',
+                                            'relative shrink-0 flex items-center justify-center gap-1.5 px-4 py-2 mt-1 mb-1 mx-1 text-[13px] font-medium transition-all rounded-full',
                                             'focus-visible:outline-none',
                                             isActive
-                                                ? 'text-primary'
-                                                : 'text-muted-foreground hover:text-foreground'
+                                                ? 'bg-[#b01e23] text-white shadow-sm'
+                                                : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'
                                         )}
                                     >
-                                        <tab.icon className="size-3.5" />
+                                        <tab.icon className={cn("size-3.5", isActive ? "text-white" : "text-slate-400")} />
                                         <span>{tab.label}</span>
                                         {tab.count !== undefined && tab.count > 0 && (
                                             <span className={cn(
                                                 'ml-0.5 rounded-full px-1.5 py-0 text-[10px] font-semibold',
                                                 isActive
-                                                    ? 'bg-primary/10 text-primary'
-                                                    : 'bg-muted text-muted-foreground'
+                                                    ? 'bg-white/20 text-white'
+                                                    : 'bg-slate-100 text-slate-500'
                                             )}>
                                                 {tab.count}
                                             </span>
                                         )}
-                                        {/* Active indicator line */}
                                         {isActive && (
                                             <motion.div
                                                 layoutId={`mobile-tab-indicator-${detail.task.instanceId}`}
-                                                className="absolute inset-x-0 bottom-0 h-[2px] bg-primary rounded-full"
-                                                transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+                                                className="absolute inset-0 rounded-full bg-[#b01e23]"
+                                                style={{ zIndex: -1 }}
+                                                transition={{ type: 'spring', bounce: 0.2, duration: 0.4 }}
                                             />
                                         )}
                                     </button>
@@ -332,6 +351,7 @@ export function TaskDetailView({
                             })}
                         </div>
                     </div>
+                </div>
 
                     {/* Animated tab content */}
                     <div className="flex-1 min-h-0 overflow-hidden relative">
@@ -339,10 +359,10 @@ export function TaskDetailView({
                             <motion.div
                                 key={activeTab}
                                 custom={animationDirection}
-                                initial={{ x: `${animationDirection * 30}%`, opacity: 0 }}
-                                animate={{ x: 0, opacity: 1 }}
-                                exit={{ x: `${-animationDirection * 30}%`, opacity: 0 }}
-                                transition={{ type: 'tween', duration: 0.2, ease: 'easeInOut' }}
+                                initial={{ x: `${animationDirection * 20}%`, opacity: 0, scale: 0.98 }}
+                                animate={{ x: 0, opacity: 1, scale: 1 }}
+                                exit={{ x: `${-animationDirection * 20}%`, opacity: 0, scale: 0.98 }}
+                                transition={{ type: 'spring', bounce: 0, duration: 0.35 }}
                                 className="absolute inset-0"
                             >
                                 <ScrollArea className="h-full">
@@ -364,6 +384,7 @@ export function TaskDetailView({
                         onDecision={onDecision}
                         isExecuting={isExecuting}
                         isApprovedScope={isApprovedScope}
+                        isMobile={isMobile}
                     />
                 </div>
             )}
@@ -377,6 +398,7 @@ export function TaskDetailView({
                             onDecision={onDecision}
                             isExecuting={isExecuting}
                             isApprovedScope={isApprovedScope}
+                            isMobile={isMobile}
                         />
                     </div>
                 </div>
@@ -390,11 +412,13 @@ function TaskActionPanel({
     onDecision,
     isExecuting,
     isApprovedScope,
+    isMobile,
 }: {
     detail: TaskDetailType;
     onDecision: (decisionKey: string, comment: string) => void;
     isExecuting: boolean;
     isApprovedScope?: boolean;
+    isMobile?: boolean;
 }) {
     if (isApprovedScope) {
         const { t } = useTranslation();
@@ -412,18 +436,18 @@ function TaskActionPanel({
     if (!hasAction) return null;
 
     return (
-        <div className="flex w-full flex-wrap items-center justify-end gap-2">
+        <div className="flex w-full items-center justify-end gap-2">
             {detail.decisions.length > 0 && (
                 <DecisionPanel
                     decisions={detail.decisions}
                     onExecute={onDecision}
                     isExecuting={isExecuting}
+                    isMobile={isMobile}
                 />
             )}
         </div>
     );
 }
-
 function SecondaryTabSkeleton({ message }: { message: string }) {
     return (
         <div className="space-y-3 rounded-lg border border-border/70 bg-card p-4">
@@ -438,21 +462,37 @@ function SecondaryTabSkeleton({ message }: { message: string }) {
 function TaskDetailSkeleton({ onBack, isMobile }: { onBack: () => void; isMobile: boolean }) {
     return (
         <div className="flex flex-col h-full">
-            <div className="flex items-start gap-3 p-4 border-b border-border/50">
-                {isMobile && (
-                    <Button variant="ghost" size="icon" onClick={onBack} className="mt-0.5">
-                        <ArrowLeft className="size-4" />
-                    </Button>
-                )}
-                <div className="flex-1 space-y-2">
-                    <Skeleton className="h-6 w-2/3" />
-                    <div className="flex gap-2">
-                        <Skeleton className="h-5 w-20 rounded-md" />
-                        <Skeleton className="h-5 w-20 rounded-md" />
-                        <Skeleton className="h-5 w-20 rounded-md" />
+            {isMobile ? (
+                <div className="px-4 pt-4 pb-2 bg-slate-50/70">
+                    <div className="rounded-xl bg-white border border-border/40 shadow-sm px-4 py-4 space-y-2.5">
+                        <div className="flex justify-between">
+                            <div className="flex gap-2">
+                                <Skeleton className="h-5 w-16 rounded-md" />
+                                <Skeleton className="h-5 w-12 rounded-md" />
+                            </div>
+                            <Skeleton className="h-5 w-20 rounded-md" />
+                        </div>
+                        <div className="flex items-start gap-2">
+                            <button onClick={onBack} className="shrink-0 mt-0.5 p-1 -ml-1 rounded-md hover:bg-slate-100">
+                                <ArrowLeft className="size-5 text-foreground" />
+                            </button>
+                            <Skeleton className="h-6 w-2/3" />
+                        </div>
+                        <Skeleton className="h-4 w-48 ml-7" />
                     </div>
                 </div>
-            </div>
+            ) : (
+                <div className="flex items-start gap-3 p-4 border-b border-border/50">
+                    <div className="flex-1 space-y-2">
+                        <Skeleton className="h-6 w-2/3" />
+                        <div className="flex gap-2">
+                            <Skeleton className="h-5 w-20 rounded-md" />
+                            <Skeleton className="h-5 w-20 rounded-md" />
+                            <Skeleton className="h-5 w-20 rounded-md" />
+                        </div>
+                    </div>
+                </div>
+            )}
             {isMobile ? (
                 <>
                     <div className="flex gap-1 px-4 py-2 border-b border-border/50">

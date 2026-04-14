@@ -9,6 +9,7 @@
     {
       "source": "^/odata/v4/(.*)$",
       "authenticationType": "xsuaa",
+      "identityProvider": "sap.default",
       "target": "/odata/v4/$1",
       "destination": "cnma_vj_my_inbox_destination",
       "csrfProtection": false
@@ -16,6 +17,7 @@
     {
       "source": "^/api/cnma/(.*)$",
       "authenticationType": "xsuaa",
+      "identityProvider": "sap.default",
       "target": "/api/cnma/$1",
       "destination": "cnma_vj_my_inbox_destination",
       "csrfProtection": false
@@ -23,15 +25,23 @@
     {
       "source": "^/api/inbox/(.*)$",
       "authenticationType": "xsuaa",
+      "identityProvider": "sap.default",
       "target": "/api/inbox/$1",
       "destination": "cnma_vj_my_inbox_destination",
       "csrfProtection": false
     },
     {
+      "source": "^/(web-manifest\\.json|pwa-icon-.*\\.png|apple-touch-icon\\.png|RESOURCE_FAVICON\\.png)$",
+      "target": "/$1",
+      "service": "html5-apps-repo-rt",
+      "authenticationType": "none"
+    },
+    {
       "source": "^(.*)$",
       "target": "$1",
       "service": "html5-apps-repo-rt",
-      "authenticationType": "xsuaa"
+      "authenticationType": "xsuaa",
+      "identityProvider": "sap.default"
     }
   ],
   "responseHeaders": [

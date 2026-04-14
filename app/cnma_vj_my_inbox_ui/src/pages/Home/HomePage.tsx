@@ -33,7 +33,7 @@ export default function HomePage() {
     // Redirect desktop users to inbox — home page is mobile-only
     useEffect(() => {
         if (!isMobile) {
-            navigate('/', { replace: true });
+            navigate('/inbox', { replace: true });
         }
     }, [isMobile, navigate]);
 
@@ -62,14 +62,14 @@ export default function HomePage() {
             icon: <Inbox className="w-6 h-6" />,
             iconClass: 'text-orange-500 bg-orange-50',
             label: t('nav.myTasks', 'My Tasks'),
-            to: '/',
+            to: '/inbox',
             state: { scope: 'my' },
         },
         {
             icon: <CheckCheck className="w-6 h-6" />,
             iconClass: 'text-emerald-600 bg-emerald-50',
             label: t('nav.approvedTasks', 'Approved Tasks'),
-            to: '/',
+            to: '/inbox',
             state: { scope: 'approved' },
         },
         {
@@ -164,7 +164,7 @@ export default function HomePage() {
                             borderColor: 'var(--border)',
                             boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
                         }}
-                        onClick={() => navigate('/', { state: { scope: 'my' } })}
+                        onClick={() => navigate('/inbox', { state: { scope: 'my' } })}
                     >
                         <div className="flex items-center gap-2.5">
                             <div
@@ -193,7 +193,7 @@ export default function HomePage() {
                             borderColor: 'var(--border)',
                             boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
                         }}
-                        onClick={() => navigate('/', { state: { scope: 'approved' } })}
+                        onClick={() => navigate('/inbox', { state: { scope: 'approved' } })}
                     >
                         <div className="flex items-center gap-2.5">
                             <div
@@ -220,7 +220,7 @@ export default function HomePage() {
                         {t('home.newestTasks', 'Newest Tasks')}
                     </h2>
                     <button
-                        onClick={() => navigate('/', { state: { scope: 'my' } })}
+                        onClick={() => navigate('/inbox', { state: { scope: 'my' } })}
                         className="text-sm font-semibold hover:underline"
                         style={{ color: 'var(--primary)' }}
                     >
@@ -316,7 +316,7 @@ export default function HomePage() {
                 onClose={() => setMobileMenuOpen(false)}
                 scope="my"
                 onScopeChange={(s) => {
-                    navigate('/', { state: { scope: s } });
+                    navigate('/inbox', { state: { scope: s } });
                 }}
                 username={dashboardData?.identity?.btpUser}
             />
