@@ -246,17 +246,18 @@ export const inboxApi = {
 
     /**
      * Get the URL for downloading a PR attachment's binary content.
+     * Uses attach_id to identify a specific file.
      */
     getPrAttachmentContentUrl: (
         documentNumber: string,
-        fileName: string,
+        attachId: string,
         sapOrigin?: string,
         disposition: 'inline' | 'attachment' = 'attachment'
     ): string => {
         const query = new URLSearchParams();
         query.set('disposition', disposition);
         if (sapOrigin) query.set('sapOrigin', sapOrigin);
-        return `${BASE_URL}/pr/${encodeURIComponent(documentNumber)}/attachments/${encodeURIComponent(fileName)}/content?${query.toString()}`;
+        return `${BASE_URL}/pr/${encodeURIComponent(documentNumber)}/attachments/${encodeURIComponent(attachId)}/content?${query.toString()}`;
     },
 
     /**

@@ -577,11 +577,11 @@ export class InboxService {
         const { data, contentType: rawContentType, fileName } =
             await this.detailAdapter.streamAttachmentContent(adapterCtx, instanceId, attachmentId);
 
-        // File size guard: 10MB default
-        const maxSize = parseInt(process.env.MAX_ATTACHMENT_SIZE_MB || '10', 10) * 1024 * 1024;
+        // File size guard: 5MB default
+        const maxSize = parseInt(process.env.MAX_ATTACHMENT_SIZE_MB || '5', 10) * 1024 * 1024;
         if (data.byteLength > maxSize) {
             throw Object.assign(
-                new Error(`Attachment exceeds maximum size of ${process.env.MAX_ATTACHMENT_SIZE_MB || '10'}MB.`),
+                new Error(`Attachment exceeds maximum size of ${process.env.MAX_ATTACHMENT_SIZE_MB || '5'}MB.`),
                 { httpStatus: 413 }
             );
         }
@@ -656,54 +656,58 @@ export class InboxService {
 
         // Map raw SAP shape → internal TaskAttachment model
         return rawAttachments.map((raw, index) => ({
-            id: `pr-att-${index}-${raw.file_name || 'unknown'}`,
+            id: raw.attach_id || `pr-att-${index}-${raw.file_name || 'unknown'}`,
             fileName: raw.file_name,
             fileDisplayName: raw.file_name,
-            mimeType: raw.mime_type,
+            mimeType: normalizeMimeType(raw.mime_type, raw.file_name),
             fileSize: raw.file_size,
+            createdAt: raw.created_on
+                ? (raw.created_time ? `${raw.created_on}T${raw.created_time}` : raw.created_on)
+                : undefined,
+            createdBy: raw.created_by,
         }));
     }
 
     /**
-     * Stream PR attachment binary content via the standalone ZI_PR_ATTACH_TAB API.
-     * Performs Base64-to-Buffer conversion when the user triggers a download.
+     * Stream PR attachment binary content via the standalone ZI_PR_ATTACHMENTS API.
+     * Uses attach_id to target a single file, avoiding fetching all attachments.
      */
     async streamPrAttachmentContent(
         identity: InboxIdentity,
         documentNumber: string,
-        fileName: string,
+        attachId: string,
         sapOrigin?: string
     ): Promise<{ data: Buffer; contentType: string; fileName: string }> {
         const result = await this.prApprovalTreeClient.fetchPrAttachmentContent(
             documentNumber,
-            fileName,
+            attachId,
             { origin: sapOrigin, userJwt: identity.userJwt }
         );
 
         if (!result) {
             throw Object.assign(
-                new Error(`Attachment "${fileName}" not found for PR ${documentNumber}.`),
+                new Error(`Attachment "${attachId}" not found for PR ${documentNumber}.`),
                 { httpStatus: 404 }
             );
         }
 
         // File size guard
-        const maxSize = parseInt(process.env.MAX_ATTACHMENT_SIZE_MB || '10', 10) * 1024 * 1024;
+        const maxSize = parseInt(process.env.MAX_ATTACHMENT_SIZE_MB || '5', 10) * 1024 * 1024;
         if (result.data.byteLength > maxSize) {
             throw Object.assign(
-                new Error(`Attachment exceeds maximum size of ${process.env.MAX_ATTACHMENT_SIZE_MB || '10'}MB.`),
+                new Error(`Attachment exceeds maximum size of ${process.env.MAX_ATTACHMENT_SIZE_MB || '5'}MB.`),
                 { httpStatus: 413 }
             );
         }
 
-        // Infer MIME type from extension if SAP returns generic type
-        const contentType = (result.contentType === 'application/octet-stream' && result.fileName)
-            ? (inferMimeFromExtension(result.fileName) || result.contentType)
-            : result.contentType;
+        // Normalize MIME type (SAP may return abbreviated types like "PDF")
+        const contentType = normalizeMimeType(result.contentType, result.fileName)
+            || inferMimeFromExtension(result.fileName)
+            || result.contentType;
 
         const cleanedFileName = cleanDuplicateExtension(result.fileName);
 
-        return { data: result.data, contentType, fileName: cleanedFileName || fileName };
+        return { data: result.data, contentType, fileName: cleanedFileName || attachId };
     }
 
     /**
@@ -892,32 +896,55 @@ function extractRequestorName(
 function inferMimeFromExtension(fileName: string): string | undefined {
     const ext = fileName.split('.').pop()?.toLowerCase();
     if (!ext) return undefined;
-    const map: Record<string, string> = {
-        pdf: 'application/pdf',
-        doc: 'application/msword',
-        docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        xls: 'application/vnd.ms-excel',
-        xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        ppt: 'application/vnd.ms-powerpoint',
-        pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-        odt: 'application/vnd.oasis.opendocument.text',
-        ods: 'application/vnd.oasis.opendocument.spreadsheet',
-        odp: 'application/vnd.oasis.opendocument.presentation',
-        png: 'image/png',
-        jpg: 'image/jpeg',
-        jpeg: 'image/jpeg',
-        gif: 'image/gif',
-        webp: 'image/webp',
-        svg: 'image/svg+xml',
-        txt: 'text/plain',
-        csv: 'text/csv',
-        html: 'text/html',
-        json: 'application/json',
-        xml: 'application/xml',
-        zip: 'application/zip',
-    };
-    return map[ext];
+    return EXTENSION_MIME_MAP[ext];
 }
+
+/**
+ * Normalize mime_type values from SAP.
+ * The ZI_PR_ATTACHMENTS API returns abbreviated types like "PDF", "XLSX"
+ * instead of proper MIME types like "application/pdf".
+ */
+function normalizeMimeType(rawMimeType?: string, fileName?: string): string | undefined {
+    if (!rawMimeType) {
+        // No mime_type from SAP — try to infer from file extension
+        return fileName ? inferMimeFromExtension(fileName) : undefined;
+    }
+
+    // If it already looks like a proper MIME type (contains '/'), return as-is
+    if (rawMimeType.includes('/')) return rawMimeType;
+
+    // SAP returns short labels like "PDF", "XLSX" — treat as extension
+    const fromShortLabel = EXTENSION_MIME_MAP[rawMimeType.toLowerCase()];
+    if (fromShortLabel) return fromShortLabel;
+
+    // Fallback: try file extension
+    return fileName ? (inferMimeFromExtension(fileName) || rawMimeType) : rawMimeType;
+}
+
+const EXTENSION_MIME_MAP: Record<string, string> = {
+    pdf: 'application/pdf',
+    doc: 'application/msword',
+    docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    xls: 'application/vnd.ms-excel',
+    xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    ppt: 'application/vnd.ms-powerpoint',
+    pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    odt: 'application/vnd.oasis.opendocument.text',
+    ods: 'application/vnd.oasis.opendocument.spreadsheet',
+    odp: 'application/vnd.oasis.opendocument.presentation',
+    png: 'image/png',
+    jpg: 'image/jpeg',
+    jpeg: 'image/jpeg',
+    gif: 'image/gif',
+    webp: 'image/webp',
+    svg: 'image/svg+xml',
+    txt: 'text/plain',
+    csv: 'text/csv',
+    html: 'text/html',
+    json: 'application/json',
+    xml: 'application/xml',
+    zip: 'application/zip',
+};
 
 /** Clean duplicate file extensions: "report.xlsx.xlsx" → "report.xlsx" */
 function cleanDuplicateExtension(fileName?: string): string | undefined {

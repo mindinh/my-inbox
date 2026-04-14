@@ -9,7 +9,7 @@ import type { TaskDetail as TaskDetailType } from '@/services/inbox/inbox.types'
 import { ArrowLeft, FileText, Undo2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useWorkflowApprovalTree } from '@/pages/Inbox/hooks/useInbox';
+import { useWorkflowApprovalTree, usePrAttachments } from '@/pages/Inbox/hooks/useInbox';
 import { invalidateAfterComment } from '@/pages/Inbox/hooks/inboxInvalidation';
 import { useQueryClient } from '@tanstack/react-query';
 import {
@@ -84,6 +84,17 @@ export function TaskDetailView({
         ? 'Failed to load workflow approval tree.'
         : undefined;
 
+    // PR attachment count for the tab badge
+    const prAttachmentsQuery = usePrAttachments(
+        isPRTask ? prDocumentId : null,
+        detail?.task.sapOrigin,
+        { enabled: !!detail && !!isPRTask }
+    );
+    const prAttachmentCount = isPRTask
+        ? (prAttachmentsQuery.data?.attachments?.length ?? undefined)
+        : undefined;
+    const isPrAttachmentsLoading = isPRTask && prAttachmentsQuery.isLoading;
+
     const tabs = useMemo(
         () =>
             detail
@@ -91,10 +102,11 @@ export function TaskDetailView({
                     detail,
                     workflowQuery.data?.steps?.length || 0,
                     workflowQuery.data?.comments,
-                    t
+                    t,
+                    prAttachmentCount
                 )
                 : [],
-        [detail, workflowQuery.data?.steps?.length, workflowQuery.data?.comments, t]
+        [detail, workflowQuery.data?.steps?.length, workflowQuery.data?.comments, t, prAttachmentCount]
     );
 
     if (isLoading) {
@@ -136,7 +148,7 @@ export function TaskDetailView({
                     />
                 );
             case 'attachments':
-                if (isSecondaryLoading && detail.attachments.length === 0) {
+                if (isPrAttachmentsLoading || (isSecondaryLoading && detail.attachments.length === 0)) {
                     return <SecondaryTabSkeleton message={t('task.loadingAttachments', 'Loading attachments...')} />;
                 }
                 return <AttachmentsPanel detail={detail} isMobile={mobile} allowUpload={showActionPanel} />;
@@ -272,7 +284,7 @@ export function TaskDetailView({
                                 />
                             </TabsContent>
                             <TabsContent value="attachments" className="mt-0 w-full">
-                                {isSecondaryLoading && detail.attachments.length === 0 ? (
+                                {isPrAttachmentsLoading || (isSecondaryLoading && detail.attachments.length === 0) ? (
                                     <SecondaryTabSkeleton message={t('task.loadingAttachments', 'Loading attachments...')} />
                                 ) : (
                                     <AttachmentsPanel detail={detail} allowUpload={showActionPanel} />
