@@ -368,15 +368,16 @@ export function makeTabDefinitions(detail: TaskDetail, workflowCount = 0, workfl
 export function StatusHeaderBadges({ detail }: { detail: TaskDetail }) {
     const context = detail.businessContext;
     return (
-        <div className="flex items-center gap-2 flex-wrap">
-            {context?.type && context.type !== 'UNKNOWN' && (
-                <div className="inline-flex items-center justify-center rounded-md border border-transparent bg-info-bg text-info px-2.5 py-0.5 text-[11px] font-bold">
-                    {context.type}
-                    {context.documentId ? ` ${context.documentId}` : ''}
-                </div>
-            )}
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+            <div className="flex items-center gap-2">
+                {context?.type && context.type !== 'UNKNOWN' && (
+                    <span className="text-sm font-bold text-foreground">
+                        {context.documentId || ''}
+                    </span>
+                )}
+                <PriorityBadge priority={detail.task.priority} />
+            </div>
             <StatusBadge status={detail.task.status} />
-            <PriorityBadge priority={detail.task.priority} />
         </div>
     );
 }

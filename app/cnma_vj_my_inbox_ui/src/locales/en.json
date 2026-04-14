@@ -43,6 +43,9 @@
         "home": "Home",
         "dashboard": "Dashboard",
         "myInbox": "prorequest",
+        "myTasks": "My Tasks",
+        "approvedTasks": "Approved Tasks",
+        "logOut": "Log Out",
         "substitutionInbox": "Substitution Inbox"
     },
     "home": {

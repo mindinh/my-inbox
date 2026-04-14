@@ -80,7 +80,7 @@ export function TaskScopeSidebar({
                                     navigate('/dashboard');
                                 } else {
                                     if (isDashboard) {
-                                        navigate('/', { state: { scope: item.value } });
+                                        navigate('/inbox', { state: { scope: item.value } });
                                     } else {
                                         onScopeChange(item.value as 'my' | 'approved');
                                     }
@@ -136,7 +136,7 @@ export function MobileSidebarSheet({
     const navigate = useNavigate();
     const location = useLocation();
     const isDashboard = location.pathname === '/dashboard';
-    const isHome = location.pathname === '/home';
+    const isHome = location.pathname === '/' || location.pathname === '/home';
     const scopeItems = useMobileScopeItems();
 
     return (
@@ -203,12 +203,13 @@ export function MobileSidebarSheet({
                                         onClick={() => {
                                             onClose();
                                             if (item.route === '/home') {
-                                                navigate('/home');
+                                                navigate('/');
                                             } else if (item.route === '/dashboard') {
                                                 navigate('/dashboard');
                                             } else {
+                                                // "my" or "approved" tasks
                                                 if (isDashboard || isHome) {
-                                                    navigate('/', { state: { scope: item.value } });
+                                                    navigate('/inbox', { state: { scope: item.value } });
                                                 } else {
                                                     onScopeChange(item.value as 'my' | 'approved');
                                                 }

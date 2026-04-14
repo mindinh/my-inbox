@@ -9,11 +9,13 @@ import {
   X,
   LogOut,
   Inbox,
+  Home,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { cn } from '@/utils/cn';
 import type { LucideIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useTasks } from '@/pages/Inbox/hooks/inboxQueries';
 
 // ── Nav config types ──────────────────────────────────────────────
 
@@ -40,7 +42,8 @@ type NavEntry = NavLeaf | NavGroup;
 function useNavTree(): NavEntry[] {
   const { t } = useTranslation();
   return [
-    { type: 'leaf', to: '/', icon: Inbox, label: t('nav.inbox', 'prorequest') },
+    { type: 'leaf', to: '/', icon: Home, label: t('nav.home', 'Home') },
+    { type: 'leaf', to: '/inbox', icon: Inbox, label: t('nav.myInbox', 'prorequest') },
     // TODO: Add more navigation items here
   ];
 }
@@ -161,6 +164,8 @@ export function MainLayout() {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const { t } = useTranslation();
   const isInWorkZone = typeof window !== 'undefined' && window.parent !== window;
+  const { data: tasksData } = useTasks({ top: 1 });
+  const username = tasksData?.identity?.btpUser || 'User';
 
   const navTree = useNavTree();
 
@@ -226,11 +231,11 @@ export function MainLayout() {
           <div className={cn("mt-auto border-t border-sidebar-border p-4", isCollapsed ? "items-center" : "")}>
             <div className={cn("flex items-center gap-3", isCollapsed ? "justify-center" : "")}>
               <div className="w-8 h-8 rounded-full bg-sidebar-accent flex items-center justify-center text-sm font-bold text-sidebar-accent-foreground shrink-0 border border-sidebar-border">
-                U
+                {username.charAt(0).toUpperCase()}
               </div>
               {!isCollapsed && (
                 <div className="overflow-hidden flex-1">
-                  <p className="text-sm font-medium text-sidebar-foreground truncate">User</p>
+                  <p className="text-sm font-medium text-sidebar-foreground truncate">{username}</p>
                 </div>
               )}
               <button

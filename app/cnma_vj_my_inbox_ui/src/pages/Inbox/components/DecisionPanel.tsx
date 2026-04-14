@@ -12,11 +12,13 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 import { CheckCircle, XCircle, HelpCircle, Loader2 } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 interface DecisionPanelProps {
     decisions: Decision[];
     onExecute: (decisionKey: string, comment: string) => void;
     isExecuting: boolean;
+    isMobile?: boolean;
 }
 
 /**
@@ -24,7 +26,7 @@ interface DecisionPanelProps {
  * Clicking a button opens a confirmation dialog where the user can add a comment.
  * Comment is mandatory for NEGATIVE decisions or when decision.commentMandatory is true.
  */
-export function DecisionPanel({ decisions, onExecute, isExecuting }: DecisionPanelProps) {
+export function DecisionPanel({ decisions, onExecute, isExecuting, isMobile }: DecisionPanelProps) {
     const [activeDecision, setActiveDecision] = useState<Decision | null>(null);
     const [comment, setComment] = useState('');
 
@@ -58,7 +60,7 @@ export function DecisionPanel({ decisions, onExecute, isExecuting }: DecisionPan
         <>
             {/* Decision Buttons — rendered dynamically from SAP TASKPROCESSING DecisionOptions */}
             {/* Order: NEGATIVE → NEUTRAL → POSITIVE (Reject before Approve) */}
-            <div className="flex flex-wrap justify-end gap-2">
+            <div className={cn("flex flex-wrap justify-end gap-2 text-[15px]", isMobile ? "w-full flex-row" : "")}>
                 {[...decisions]
                     .sort((a, b) => {
                         const order: Record<string, number> = { NEGATIVE: 0, NEUTRAL: 1, POSITIVE: 2 };
@@ -71,6 +73,7 @@ export function DecisionPanel({ decisions, onExecute, isExecuting }: DecisionPan
                             onClick={() => handleOpen(decision)}
                             disabled={isExecuting}
                             isExecuting={isExecuting}
+                            isMobile={isMobile}
                         />
                     ))}
             </div>
@@ -157,31 +160,48 @@ function DecisionButton({
     onClick,
     disabled,
     isExecuting,
+    isMobile,
 }: {
     decision: Decision;
     onClick: () => void;
     disabled: boolean;
     isExecuting: boolean;
+    isMobile?: boolean;
 }) {
+    // If mobile, we want exact colors bridging to original Fiori colors
+    const nature = decision.nature || 'NEUTRAL';
+    
+    // For mobile we apply specific explicit backgrounds matching the UI requested
+    let mobileClasses = "";
+    if (isMobile) {
+        if (nature === 'NEGATIVE') {
+            mobileClasses = "bg-[#b01e23] hover:bg-[#93191d] text-white flex-1 rounded-xl h-10 shadow-sm border-0";
+        } else if (nature === 'POSITIVE') {
+            mobileClasses = "bg-[#2b6a32] hover:bg-[#205226] text-white flex-1 rounded-xl h-10 shadow-sm border-0";
+        } else {
+            mobileClasses = "flex-1 rounded-xl h-10 shadow-sm";
+        }
+    }
+
     const variantMap: Record<string, 'success' | 'destructive' | 'outline'> = {
         POSITIVE: 'success',
         NEGATIVE: 'destructive',
         NEUTRAL: 'outline',
     };
 
-    const variant = variantMap[decision.nature || 'NEUTRAL'] || 'outline';
+    const variant = variantMap[nature] || 'outline';
 
     return (
         <Button
             id={`decision-btn-${decision.key}`}
-            variant={variant}
+            variant={isMobile && nature !== 'NEUTRAL' ? 'default' : variant}
             onClick={onClick}
             disabled={disabled}
-            className="min-w-[100px]"
+            className={cn("min-w-[100px]", mobileClasses)}
         >
             {isExecuting ? (
                 <Loader2 className="size-4 animate-spin" />
-            ) : (
+            ) : !isMobile && (
                 <DecisionIcon nature={decision.nature} />
             )}
             {decision.text}
