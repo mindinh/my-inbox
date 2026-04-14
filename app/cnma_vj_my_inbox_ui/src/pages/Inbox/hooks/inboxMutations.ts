@@ -21,6 +21,7 @@ import {
     invalidateAfterForward,
     invalidateAfterComment,
     invalidateAfterAttachment,
+    invalidatePrAttachments,
 } from './inboxInvalidation';
 
 // ─── useDecision ───────────────────────────────────────────
@@ -152,6 +153,40 @@ export function useAddAttachment() {
                 toast.dismiss(mutationContext.toastId);
             }
             toast.error(extractErrorMessage(error, 'Failed to upload attachment'));
+        },
+    });
+}
+
+// ─── useUploadPrAttachment (Standalone PR API) ─────────────
+export function useUploadPrAttachment() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: ({
+            documentNumber,
+            file,
+            sapOrigin,
+        }: {
+            documentNumber: string;
+            file: File;
+            sapOrigin?: string;
+        }) => inboxApi.uploadPrAttachment(documentNumber, file, sapOrigin),
+        onMutate: () => {
+            const toastId = toast.loading('Uploading PR attachment...');
+            return { toastId };
+        },
+        onSuccess: (data, variables, mutationContext) => {
+            if (mutationContext?.toastId) {
+                toast.dismiss(mutationContext.toastId);
+            }
+            toast.success(data.message || 'PR Attachment uploaded.');
+            invalidatePrAttachments(queryClient, variables.documentNumber);
+        },
+        onError: (error: any, _variables, mutationContext) => {
+            if (mutationContext?.toastId) {
+                toast.dismiss(mutationContext.toastId);
+            }
+            toast.error(extractErrorMessage(error, 'Failed to upload PR attachment'));
         },
     });
 }

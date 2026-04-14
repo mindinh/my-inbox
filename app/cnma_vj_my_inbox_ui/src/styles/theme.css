@@ -126,6 +126,41 @@
    --info-bg: #e1f4ff;
 
    /* ─────────────────────────────────────────
+     MARKETING COLOR PALETTE (SAP)
+     ───────────────────────────────────────── */
+   --marketing-positive: #297828;
+   --marketing-positive-bg: #EBF5EB;
+   --marketing-positive-border: #B5D8B4;
+
+   --marketing-negative: #C00000;
+   --marketing-negative-bg: #FFEBEB;
+   --marketing-negative-border: #FFB3B3;
+
+   --marketing-attention: #C04F15;
+   --marketing-attention-bg: #FFF3E8;
+   --marketing-attention-border: #FFD4A8;
+
+   --marketing-info-blue: #003E8A;
+   --marketing-info-blue-bg: #EBF1FF;
+   --marketing-info-blue-border: #B3CCFF;
+
+   --marketing-info-teal: #107378;
+   --marketing-info-teal-bg: #EAF7F8;
+   --marketing-info-teal-border: #B2E2E4;
+
+   --marketing-risk: #854703;
+   --marketing-risk-bg: #FFF8E5;
+   --marketing-risk-border: #FFE699;
+
+   --marketing-obsoleted: #7F7F7F;
+   --marketing-obsoleted-bg: #F2F2F2;
+   --marketing-obsoleted-border: #CCCCCC;
+
+   --marketing-notifications: #000000;
+   --marketing-notifications-bg: #F5F5F5;
+   --marketing-notifications-border: #D9D9D9;
+
+   /* ─────────────────────────────────────────
      SIDEBAR (SAP Shell Navigation)
      ───────────────────────────────────────── */
    --sidebar: #f8fafc;
@@ -211,6 +246,32 @@
    --color-warning-bg: var(--warning-bg);
    --color-info: var(--info);
    --color-info-bg: var(--info-bg);
+
+   /* Marketing palette */
+   --color-marketing-positive: var(--marketing-positive);
+   --color-marketing-positive-bg: var(--marketing-positive-bg);
+   --color-marketing-positive-border: var(--marketing-positive-border);
+   --color-marketing-negative: var(--marketing-negative);
+   --color-marketing-negative-bg: var(--marketing-negative-bg);
+   --color-marketing-negative-border: var(--marketing-negative-border);
+   --color-marketing-attention: var(--marketing-attention);
+   --color-marketing-attention-bg: var(--marketing-attention-bg);
+   --color-marketing-attention-border: var(--marketing-attention-border);
+   --color-marketing-info-blue: var(--marketing-info-blue);
+   --color-marketing-info-blue-bg: var(--marketing-info-blue-bg);
+   --color-marketing-info-blue-border: var(--marketing-info-blue-border);
+   --color-marketing-info-teal: var(--marketing-info-teal);
+   --color-marketing-info-teal-bg: var(--marketing-info-teal-bg);
+   --color-marketing-info-teal-border: var(--marketing-info-teal-border);
+   --color-marketing-risk: var(--marketing-risk);
+   --color-marketing-risk-bg: var(--marketing-risk-bg);
+   --color-marketing-risk-border: var(--marketing-risk-border);
+   --color-marketing-obsoleted: var(--marketing-obsoleted);
+   --color-marketing-obsoleted-bg: var(--marketing-obsoleted-bg);
+   --color-marketing-obsoleted-border: var(--marketing-obsoleted-border);
+   --color-marketing-notifications: var(--marketing-notifications);
+   --color-marketing-notifications-bg: var(--marketing-notifications-bg);
+   --color-marketing-notifications-border: var(--marketing-notifications-border);
 
    /* Radius */
    --radius-sm: calc(var(--radius) - 4px);

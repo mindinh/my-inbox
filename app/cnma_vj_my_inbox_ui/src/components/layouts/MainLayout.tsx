@@ -9,11 +9,13 @@ import {
   X,
   LogOut,
   Inbox,
+  Home,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { cn } from '@/utils/cn';
 import type { LucideIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useCurrentUser } from '@/pages/Inbox/hooks/inboxQueries';
 
 // ── Nav config types ──────────────────────────────────────────────
 
@@ -40,7 +42,8 @@ type NavEntry = NavLeaf | NavGroup;
 function useNavTree(): NavEntry[] {
   const { t } = useTranslation();
   return [
-    { type: 'leaf', to: '/', icon: Inbox, label: t('nav.inbox', 'My Inbox') },
+    { type: 'leaf', to: '/', icon: Home, label: t('nav.home', 'Home') },
+    { type: 'leaf', to: '/inbox', icon: Inbox, label: t('nav.myInbox', 'prorequest') },
     // TODO: Add more navigation items here
   ];
 }
@@ -161,6 +164,8 @@ export function MainLayout() {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const { t } = useTranslation();
   const isInWorkZone = typeof window !== 'undefined' && window.parent !== window;
+  const { data: userInfo } = useCurrentUser();
+  const username = userInfo?.displayName || 'User';
 
   const navTree = useNavTree();
 
@@ -187,7 +192,7 @@ export function MainLayout() {
             {!isCollapsed && (
               <div className="flex items-center gap-2 overflow-hidden">
                 <img src="./RESOURCE_FAVICON.png" alt="Logo" className="w-6 h-6 shrink-0 rounded-sm" />
-                <span className="text-sm font-bold tracking-wide text-sidebar-foreground">{t('app.title', 'My Inbox')}</span>
+                <span className="text-sm font-bold tracking-wide text-sidebar-foreground">{t('app.title', 'prorequest')}</span>
               </div>
             )}
 
@@ -226,11 +231,11 @@ export function MainLayout() {
           <div className={cn("mt-auto border-t border-sidebar-border p-4", isCollapsed ? "items-center" : "")}>
             <div className={cn("flex items-center gap-3", isCollapsed ? "justify-center" : "")}>
               <div className="w-8 h-8 rounded-full bg-sidebar-accent flex items-center justify-center text-sm font-bold text-sidebar-accent-foreground shrink-0 border border-sidebar-border">
-                U
+                {username.charAt(0).toUpperCase()}
               </div>
               {!isCollapsed && (
                 <div className="overflow-hidden flex-1">
-                  <p className="text-sm font-medium text-sidebar-foreground truncate">User</p>
+                  <p className="text-sm font-medium text-sidebar-foreground truncate">{username}</p>
                 </div>
               )}
               <button
@@ -265,7 +270,7 @@ export function MainLayout() {
           </Button>
           <div className="flex items-center gap-2 flex-1">
             <img src="./RESOURCE_FAVICON.png" alt="Logo" className="w-6 h-6 shrink-0 rounded-sm" />
-            <h1 className="text-[17px] font-bold text-slate-800 tracking-tight">{t('app.title', 'My Inbox')}</h1>
+            <h1 className="text-[17px] font-bold text-slate-800 tracking-tight">{t('app.title', 'prorequest')}</h1>
           </div>
         </div>
 

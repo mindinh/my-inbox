@@ -6,14 +6,16 @@
  *   - CommentsPanel      (merged comments + add-comment form)
  *   - WorkflowApprovalPanel (PR approval tree with expandable steps)
  *
- * BusinessPanel, ActivityPanel, and utility functions remain here
- * as they are smaller and tightly coupled to the tab definitions.
+ * OverviewPanel, DetailsPanel, ActivityPanel, and utility functions
+ * remain here as they are tightly coupled to the tab definitions.
  */
 import { useState } from 'react';
 import {
     Calendar,
     Clock3,
     GitBranch,
+    LayoutDashboard,
+    List,
     MessageSquare,
     Paperclip,
     Tag,
@@ -58,9 +60,9 @@ export { WorkflowApprovalPanel } from './panels/WorkflowApprovalPanel';
 import { StatusBadge, PriorityBadge } from './TaskBadges';
 import { useTranslation } from 'react-i18next';
 
-// ─── BusinessPanel ─────────────────────────────────────────
+// ─── OverviewPanel (header fields only) ────────────────────
 
-export function BusinessPanel({
+export function OverviewPanel({
     model,
     detail,
     isMobile = false,
@@ -69,11 +71,6 @@ export function BusinessPanel({
     detail: TaskDetail;
     isMobile?: boolean;
 }) {
-    const [selectedRow, setSelectedRow] = useState<{
-        tableTitle: string;
-        rowId: string;
-        fields: Array<{ label: string; value: string }>;
-    } | null>(null);
     const allFields = [
         { key: 'sys_created_on', label: 'Created On', value: formatDate(detail.task.createdOn) },
         ...model.cards.flatMap((card) => card.fields).filter(f => f.label !== 'Created On' && f.label !== 'Creation Date')
@@ -131,10 +128,41 @@ export function BusinessPanel({
                     </CardContent>
                 </Card>
             )}
+        </div>
+    );
+}
 
-            {model.tables
-                .filter((table) => !['Header Facts', 'Custom Attributes', 'Related Objects'].includes(table.title))
-                .map((table) => (
+// ─── DetailsPanel (tables only) ────────────────────────────
+
+export function DetailsPanel({
+    model,
+    detail,
+    isMobile = false,
+}: {
+    model: BusinessSectionModel;
+    detail: TaskDetail;
+    isMobile?: boolean;
+}) {
+    const [selectedRow, setSelectedRow] = useState<{
+        tableTitle: string;
+        rowId: string;
+        fields: Array<{ label: string; value: string }>;
+    } | null>(null);
+
+    const filteredTables = model.tables
+        .filter((table) => !['Header Facts', 'Custom Attributes', 'Related Objects'].includes(table.title));
+
+    if (filteredTables.length === 0) {
+        return (
+            <div className="rounded-xl border border-dashed border-border/70 px-4 py-10 text-center text-sm text-muted-foreground">
+                No detail items available for this task.
+            </div>
+        );
+    }
+
+    return (
+        <div className="space-y-6">
+            {filteredTables.map((table) => (
                     <Card key={table.id} className="gap-0 bg-card border-border/70 shadow-sm">
                         <CardHeader className="pb-3">
                             <CardTitle className="text-base">{table.title}</CardTitle>
@@ -347,10 +375,16 @@ export function makeTabDefinitions(detail: TaskDetail, workflowCount = 0, workfl
 
     return [
         {
-            value: 'business',
-            label: t ? t('task.information', 'Information') : 'Information',
-            icon: Tag,
+            value: 'overview',
+            label: t ? t('task.overview', 'Overview') : 'Overview',
+            icon: LayoutDashboard,
             count: undefined,
+        },
+        {
+            value: 'details',
+            label: t ? t('task.details', 'Details') : 'Details',
+            icon: List,
+            count: poFactsCount > 0 ? poFactsCount : undefined,
         },
         {
             value: 'workflow',
@@ -368,12 +402,11 @@ export function makeTabDefinitions(detail: TaskDetail, workflowCount = 0, workfl
 export function StatusHeaderBadges({ detail }: { detail: TaskDetail }) {
     const context = detail.businessContext;
     return (
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex items-center gap-2 overflow-hidden">
             {context?.type && context.type !== 'UNKNOWN' && (
-                <div className="inline-flex items-center justify-center rounded-md border border-transparent bg-info-bg text-info px-2.5 py-0.5 text-[11px] font-bold">
-                    {context.type}
-                    {context.documentId ? ` ${context.documentId}` : ''}
-                </div>
+                <span className="inline-flex items-center rounded bg-blue-50 px-2 py-0.5 text-[12px] font-semibold text-blue-600 tracking-wide shrink-0 truncate max-w-[200px]">
+                    {context.type} {context.documentId || ''}
+                </span>
             )}
             <StatusBadge status={detail.task.status} />
             <PriorityBadge priority={detail.task.priority} />

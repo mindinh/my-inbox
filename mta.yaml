@@ -55,6 +55,8 @@ modules:
     parameters:
       memory: 256M
       disk-quota: 512M
+    properties:
+      DYNAMIC_IDENTITY_PROVIDER: true
     requires:
       - name: cnma-vj-my-inbox-auth
       - name: srv-api

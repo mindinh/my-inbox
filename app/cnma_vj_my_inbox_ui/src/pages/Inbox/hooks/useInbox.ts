@@ -18,9 +18,13 @@ export { inboxKeys } from './inboxKeys';
 export {
     useTasks,
     useApprovedTasks,
+    useInfiniteTasks,
+    useInfiniteApprovedTasks,
+    useTaskOverview,
     useTaskInformation,
     useTaskDetail,
     useWorkflowApprovalTree,
+    usePrAttachments,
 } from './inboxQueries';
 
 // Mutation hooks
@@ -29,4 +33,5 @@ export {
     useForward,
     useAddComment,
     useAddAttachment,
+    useUploadPrAttachment,
 } from './inboxMutations';

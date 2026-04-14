@@ -55,11 +55,11 @@ export default function App() {
             <div className="min-h-screen bg-background">
                 <Suspense fallback={<PageLoader />}>
                     <Routes>
-                        {/* Inbox is the main landing page */}
-                        <Route path="/" element={<InboxPage />} />
+                        {/* Home is the main landing page */}
+                        <Route path="/" element={<HomePage />} />
+                        <Route path="/home" element={<HomePage />} />
                         <Route path="/inbox" element={<InboxPage />} />
                         <Route path="/tasks/:taskId" element={<InboxPage />} />
-                        <Route path="/home" element={<HomePage />} />
                         <Route path="/dashboard" element={<DashboardPage />} />
                     </Routes>
                 </Suspense>

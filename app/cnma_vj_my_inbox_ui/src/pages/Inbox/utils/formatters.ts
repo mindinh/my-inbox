@@ -78,7 +78,11 @@ export function formatAmountWithCurrency(value?: string | number, currency?: str
     if (value == null) return '-';
     const num = Number(value);
     if (Number.isNaN(num)) return currency ? `${value} ${currency}` : String(value);
-    const formatted = num.toLocaleString('en-US', { maximumFractionDigits: 2 });
+    
+    // VND does not use fractional denominations
+    const maxFractionDigits = currency?.toUpperCase() === 'VND' ? 0 : 2;
+    
+    const formatted = num.toLocaleString('en-US', { maximumFractionDigits: maxFractionDigits });
     return currency ? `${formatted} ${currency}` : formatted;
 }
 

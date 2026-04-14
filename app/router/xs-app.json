@@ -9,12 +9,14 @@
     {
       "source": "^/odata/v4/(.*)$",
       "authenticationType": "xsuaa",
+      "identityProvider": "sap.default",
       "destination": "srv-api",
       "csrfProtection": false
     },
     {
       "source": "^/api/(.*)$",
       "authenticationType": "xsuaa",
+      "identityProvider": "sap.default",
       "destination": "srv-api",
       "csrfProtection": false
     },
@@ -22,13 +24,15 @@
       "source": "^/cnma/(.*)$",
       "target": "/cnma/$1",
       "localDir": "resources",
-      "authenticationType": "xsuaa"
+      "authenticationType": "xsuaa",
+      "identityProvider": "sap.default"
     },
     {
       "source": "^(.*)$",
       "target": "$1",
       "localDir": "resources/cnma",
-      "authenticationType": "xsuaa"
+      "authenticationType": "xsuaa",
+      "identityProvider": "sap.default"
     },
     {
       "source": "^/user-api(.*)",

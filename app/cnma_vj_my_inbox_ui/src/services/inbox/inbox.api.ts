@@ -3,6 +3,7 @@ import type {
     TaskListResponse,
     TaskDetailResponse,
     TaskActionResponse,
+    TaskAttachment,
     DecisionRequest,
     ForwardRequest,
     WorkflowApprovalTreeResponse,
@@ -12,11 +13,29 @@ import type {
 // Keep API paths relative so Work Zone managed approuter can resolve app-local routes.
 const BASE_URL = 'api/inbox';
 
+/** Shape returned by GET /api/inbox/me */
+export interface UserInfo {
+    id: string;
+    sapUser?: string;
+    displayName: string;
+    firstName?: string;
+    lastName?: string;
+    email?: string;
+}
+
 /**
  * Inbox API — All backend calls for the inbox feature.
  * Uses the existing axiosInstance which handles CSRF tokens, auth, and error retries.
  */
 export const inboxApi = {
+    /**
+     * Get current user display info (name, email) from JWT claims.
+     */
+    getCurrentUser: async (): Promise<UserInfo> => {
+        const { data } = await axiosInstance.get<UserInfo>(`${BASE_URL}/me`);
+        return data;
+    },
+
     /**
      * Get dashboard data for the current user.
      * Returns all task records from the ZI_PR_DASH_BOARD entity.
@@ -62,6 +81,27 @@ export const inboxApi = {
     getTaskDetail: async (instanceId: string): Promise<TaskDetailResponse> => {
         const { data } = await axiosInstance.get<TaskDetailResponse>(
             `${BASE_URL}/tasks/${encodeURIComponent(instanceId)}`
+        );
+        return data;
+    },
+
+    /**
+     * Get ultra-lightweight task overview for fastest initial detail render.
+     * Uses a 3-segment SAP $batch (excludes heavy TaskObjects and Attachments).
+     * Accepts optional hints from the task list item to help the backend
+     * skip redundant SAP round-trips and run enrichment in parallel.
+     */
+    getTaskOverview: async (
+        instanceId: string,
+        hints?: { sapOrigin?: string; documentId?: string; businessObjectType?: string }
+    ): Promise<TaskDetailResponse> => {
+        const query = new URLSearchParams();
+        if (hints?.sapOrigin) query.set('sapOrigin', hints.sapOrigin);
+        if (hints?.documentId) query.set('documentId', hints.documentId);
+        if (hints?.businessObjectType) query.set('businessObjectType', hints.businessObjectType);
+        const qs = query.toString();
+        const { data } = await axiosInstance.get<TaskDetailResponse>(
+            `${BASE_URL}/tasks/${encodeURIComponent(instanceId)}/overview${qs ? `?${qs}` : ''}`
         );
         return data;
     },
@@ -184,5 +224,63 @@ export const inboxApi = {
         disposition: 'inline' | 'attachment' = 'inline'
     ): string => {
         return `${BASE_URL}/tasks/${encodeURIComponent(instanceId)}/attachments/${encodeURIComponent(attachmentId)}/content?disposition=${disposition}`;
+    },
+
+    // ─── PR Attachment API (Standalone) ─────────────────────
+
+    /**
+     * Get PR attachment metadata list from the standalone ZI_PR_ATTACH_TAB API.
+     */
+    getPrAttachments: async (
+        documentNumber: string,
+        sapOrigin?: string
+    ): Promise<{ attachments: TaskAttachment[]; count: number }> => {
+        const query = new URLSearchParams();
+        if (sapOrigin) query.set('sapOrigin', sapOrigin);
+        const qs = query.toString();
+        const { data } = await axiosInstance.get<{ attachments: TaskAttachment[]; count: number }>(
+            `${BASE_URL}/pr/${encodeURIComponent(documentNumber)}/attachments${qs ? `?${qs}` : ''}`
+        );
+        return data;
+    },
+
+    /**
+     * Get the URL for downloading a PR attachment's binary content.
+     */
+    getPrAttachmentContentUrl: (
+        documentNumber: string,
+        fileName: string,
+        sapOrigin?: string,
+        disposition: 'inline' | 'attachment' = 'attachment'
+    ): string => {
+        const query = new URLSearchParams();
+        query.set('disposition', disposition);
+        if (sapOrigin) query.set('sapOrigin', sapOrigin);
+        return `${BASE_URL}/pr/${encodeURIComponent(documentNumber)}/attachments/${encodeURIComponent(fileName)}/content?${query.toString()}`;
+    },
+
+    /**
+     * Upload an attachment to a PR document via the standalone API.
+     */
+    uploadPrAttachment: async (
+        documentNumber: string,
+        file: File,
+        sapOrigin?: string
+    ): Promise<TaskActionResponse> => {
+        const buffer = await file.arrayBuffer();
+        const headers: Record<string, string> = {
+            'Content-Type': file.type || 'application/octet-stream',
+            Slug: encodeURIComponent(file.name),
+        };
+        if (sapOrigin) {
+            headers['x-sap-origin'] = sapOrigin;
+        }
+
+        const { data } = await axiosInstance.post<TaskActionResponse>(
+            `${BASE_URL}/pr/${encodeURIComponent(documentNumber)}/attachments`,
+            buffer,
+            { headers }
+        );
+        return data;
     },
 };

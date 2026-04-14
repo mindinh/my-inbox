@@ -374,6 +374,37 @@ export class MockSapTaskClient implements ISapTaskClient {
         };
     }
 
+    async fetchTaskOverviewBundle(
+        _sapUser: string,
+        instanceId: string,
+        _userJwt?: string,
+        _hints?: { sapOrigin?: string }
+    ): Promise<SapTaskRaw> {
+        await this.delay();
+        console.log(`[MockSAP] fetchTaskOverviewBundle(${instanceId})`);
+        const task = MOCK_TASKS.find((t) => t.InstanceID === instanceId);
+        if (!task) throw new Error(`Task ${instanceId} not found`);
+        const taskDefinitionData = task.TaskDefinitionID
+            ? {
+                TaskDefinitionID: task.TaskDefinitionID,
+                TaskName: task.TaskDefinitionName,
+                CustomAttributeDefinitionData: {
+                    results: MOCK_CUSTOM_ATTRIBUTE_DEFINITIONS[task.TaskDefinitionID] || [],
+                },
+            }
+            : undefined;
+        return {
+            ...task,
+            Description: MOCK_DESCRIPTIONS[instanceId] || undefined,
+            DecisionOptions: { results: MOCK_DECISIONS[instanceId] || [] },
+            TaskDefinitionData: taskDefinitionData,
+            CustomAttributeData: { results: MOCK_CUSTOM_ATTRIBUTES[instanceId] || [] },
+            // Overview-only: no TaskObjects, no Attachments
+            TaskObjects: { results: [] },
+            Attachments: { results: [] },
+        };
+    }
+
     async fetchDecisionOptions(
         _sapUser: string,
         instanceId: string,

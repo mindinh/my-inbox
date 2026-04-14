@@ -11,10 +11,12 @@ import {
     AlertCircle,
     Menu,
     ChevronRight,
+    RefreshCw,
 } from 'lucide-react';
 import { useDashboardQuery, useDashboardData, STATUS_COLORS, STATUS_LABELS } from './use-dashboard-data';
 import type { DonutSegment, BarDataItem } from './use-dashboard-data';
 import { StatusBadge } from '@/pages/Inbox/components/TaskBadges';
+import { useCurrentUser } from '@/pages/Inbox/hooks/inboxQueries';
 import {
     Table,
     TableBody,
@@ -24,6 +26,22 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
+
+// ═══════════════════════════════════════════════════════════
+// Refetch Overlay — shown over each chart card while refreshing
+// ═══════════════════════════════════════════════════════════
+
+function RefetchOverlay() {
+    return (
+        <div className="absolute inset-0 z-10 flex items-center justify-center rounded-[14px] backdrop-blur-[2px] transition-opacity duration-300"
+            style={{ backgroundColor: 'rgba(255,255,255,0.55)' }}
+        >
+            <div className="flex flex-col items-center gap-2">
+                <Loader2 className="animate-spin" size={24} style={{ color: 'var(--primary)' }} />
+            </div>
+        </div>
+    );
+}
 
 // ═══════════════════════════════════════════════════════════
 // SVG Donut Chart
@@ -102,7 +120,7 @@ function DonutChart({
 }
 
 // ═══════════════════════════════════════════════════════════
-// Stacked Horizontal Bar Chart (New / Approved / Rejected)
+// Stacked Horizontal Bar Chart (In Approving / Approved / Rejected)
 // Always shows all 3 segments. selectedStatus greys out non-active.
 // ═══════════════════════════════════════════════════════════
 
@@ -303,8 +321,9 @@ export default function DashboardPage() {
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
     const isMobile = useIsMobile();
     const navigate = useNavigate();
+    const { data: userInfo } = useCurrentUser();
 
-    const { data: dashboardData, isLoading, isError } = useDashboardQuery();
+    const { data: dashboardData, isLoading, isError, refetch, isRefetching } = useDashboardQuery();
     const tasks = dashboardData?.items ?? [];
 
     const {
@@ -349,17 +368,17 @@ export default function DashboardPage() {
             {/* Mobile App Header — gradient background */}
             {isMobile && (
                 <div
-                    className="px-4 py-3 flex items-center shadow-sm relative z-20 shrink-0"
+                    className="px-4 py-3 flex items-center shadow-sm relative z-20 shrink-0 w-full min-h-[60px]"
                     style={{ background: 'linear-gradient(135deg, var(--primary) 0%, var(--primary-hover) 100%)' }}
                 >
                     <button
                         onClick={() => setMobileMenuOpen(true)}
-                        className="flex items-center justify-center w-9 h-9 rounded-lg transition-colors hover:bg-white/10 active:bg-white/20 mr-3"
+                        className="flex items-center justify-center w-9 h-9 rounded-lg transition-colors hover:bg-white/10 active:bg-white/20 relative z-10"
                         aria-label="Open navigation menu"
                     >
                         <Menu size={22} className="text-white" />
                     </button>
-                    <h1 className="text-lg font-bold text-white tracking-wide">
+                    <h1 className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-lg font-bold text-white tracking-wide pointer-events-none">
                         {t('nav.dashboard', 'Dashboard')}
                     </h1>
                 </div>
@@ -379,28 +398,37 @@ export default function DashboardPage() {
                                 </p>
                             </div>
                         )}
-                        {isMobile && (
-                            <div>
-                                <h2 className="text-lg font-bold" style={{ color: 'var(--foreground)' }}>
-                                    {t('dashboard.title')}
-                                </h2>
-                            </div>
-                        )}
                     </div>
-                    {hasFilters && (
+                    <div className="flex items-center gap-2">
                         <button
-                            onClick={clearAllFilters}
+                            onClick={() => refetch()}
+                            disabled={isRefetching}
                             className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-colors"
                             style={{
-                                color: 'var(--destructive)',
-                                backgroundColor: 'var(--error-bg)',
-                                border: '1px solid var(--destructive)',
+                                color: 'var(--primary)',
+                                backgroundColor: 'var(--background)',
+                                border: '1px solid var(--border)',
                             }}
+                            title={t('common.refresh', 'Refresh')}
                         >
-                            <X size={12} />
-                            {t('dashboard.clearFilters')}
+                            <RefreshCw size={12} className={isRefetching ? 'animate-spin' : ''} />
+                            {t('common.refresh', 'Refresh')}
                         </button>
-                    )}
+                        {hasFilters && (
+                            <button
+                                onClick={clearAllFilters}
+                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-colors"
+                                style={{
+                                    color: 'var(--destructive)',
+                                    backgroundColor: 'var(--error-bg)',
+                                    border: '1px solid var(--destructive)',
+                                }}
+                            >
+                                <X size={12} />
+                                {t('dashboard.clearFilters')}
+                            </button>
+                        )}
+                    </div>
                 </div>
             </div>
 
@@ -458,9 +486,10 @@ export default function DashboardPage() {
                             initial={{ opacity: 0, y: 16 }}
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ duration: 0.35 }}
-                            className="p-5 md:p-6"
+                            className="p-5 md:p-6 relative"
                             style={cardStyle}
                         >
+                            {isRefetching && <RefetchOverlay />}
                             <div className="flex flex-col items-center">
                                 <h3 className="text-xs md:text-sm font-bold mb-5 tracking-widest"
                                     style={{ color: 'var(--foreground)' }}>
@@ -512,9 +541,10 @@ export default function DashboardPage() {
                             initial={{ opacity: 0, y: 16 }}
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ duration: 0.35, delay: 0.1 }}
-                            className="overflow-hidden"
+                            className="overflow-hidden relative"
                             style={cardStyle}
                         >
+                            {isRefetching && <RefetchOverlay />}
                             <div className="px-5 pt-5 pb-2 md:px-6 md:pt-6">
                                 <h3 className="text-xs md:text-sm font-bold tracking-widest"
                                     style={{ color: 'var(--foreground)' }}>
@@ -581,9 +611,10 @@ export default function DashboardPage() {
                         initial={{ opacity: 0, y: 16 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: 0.35, delay: 0.2 }}
-                        className="overflow-hidden"
+                        className="overflow-hidden relative"
                         style={cardStyle}
                     >
+                        {isRefetching && <RefetchOverlay />}
                         <div className="px-5 pt-5 pb-3 md:px-6 md:pt-6 flex items-center justify-between">
                             <div>
                                 <h3 className="text-xs md:text-sm font-bold tracking-widest"
@@ -636,7 +667,7 @@ export default function DashboardPage() {
                                             <div className="flex flex-col items-end pr-5 shrink-0 space-y-1.5">
                                                 {row.totalNetAmount != null ? (
                                                     <p className="text-sm font-bold truncate tabular-nums text-foreground">
-                                                        {row.totalNetAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {row.displayCurrency}
+                                                        {row.totalNetAmount.toLocaleString(undefined, { minimumFractionDigits: row.displayCurrency?.toUpperCase() === 'VND' ? 0 : 2, maximumFractionDigits: row.displayCurrency?.toUpperCase() === 'VND' ? 0 : 2 })} {row.displayCurrency}
                                                     </p>
                                                 ) : (
                                                     <p className="text-sm font-bold truncate text-muted-foreground">—</p>
@@ -683,7 +714,7 @@ export default function DashboardPage() {
                                                 </TableCell>
                                                 <TableCell className="px-5 py-3.5 text-xs md:text-sm font-bold text-right tabular-nums text-foreground">
                                                     {row.totalNetAmount != null
-                                                        ? `${row.totalNetAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${row.displayCurrency}`
+                                                        ? `${row.totalNetAmount.toLocaleString(undefined, { minimumFractionDigits: row.displayCurrency?.toUpperCase() === 'VND' ? 0 : 2, maximumFractionDigits: row.displayCurrency?.toUpperCase() === 'VND' ? 0 : 2 })} ${row.displayCurrency}`
                                                         : '—'}
                                                 </TableCell>
                                             </TableRow>
@@ -708,6 +739,7 @@ export default function DashboardPage() {
                     onClose={() => setMobileMenuOpen(false)}
                     scope="my"
                     onScopeChange={handleScopeChange}
+                    username={userInfo?.displayName}
                 />
             </div>
         );

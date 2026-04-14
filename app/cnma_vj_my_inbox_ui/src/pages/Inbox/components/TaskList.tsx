@@ -5,14 +5,15 @@
  *   - useTaskSelection (selection state)
  *   - useTaskFilters   (filter state + client-side filtering)
  *   - MassActionBar    (bulk action UI)
- *   - TaskPagination   (prev/next pagination)
  *   - TaskCard         (individual task rendering)
+ *
+ * Uses infinite scroll (IntersectionObserver) instead of pagination.
  */
+import { useRef, useEffect, useCallback } from 'react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Skeleton } from '@/components/ui/skeleton';
 import { TaskCard } from './TaskCard';
 import { MassActionBar } from './MassActionBar';
-import { TaskPagination } from './TaskPagination';
 import type { InboxTask } from '@/services/inbox/inbox.types';
 import {
     Inbox,
@@ -22,6 +23,7 @@ import {
     PanelLeftClose,
     Filter,
     Search,
+    Loader2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -45,11 +47,11 @@ interface TaskListProps {
     isLoading: boolean;
     onRefresh: () => void;
     isRefreshing: boolean;
-    currentPage?: number;
-    pageSize?: number;
     totalItems?: number;
-    onPageChange?: (page: number) => void;
-    isPageLoading?: boolean;
+    // Infinite scroll
+    hasNextPage?: boolean;
+    isFetchingNextPage?: boolean;
+    onLoadMore?: () => void;
     showScopeTabs?: boolean;
     myTasksCount?: number;
     approvedTasksCount?: number;
@@ -74,11 +76,10 @@ export function TaskList({
     isLoading,
     onRefresh,
     isRefreshing,
-    currentPage = 0,
-    pageSize = 20,
     totalItems = tasks.length,
-    onPageChange,
-    isPageLoading = false,
+    hasNextPage = false,
+    isFetchingNextPage = false,
+    onLoadMore,
     showScopeTabs = false,
     myTasksCount,
     approvedTasksCount,
@@ -105,18 +106,32 @@ export function TaskList({
 
     const filters = useTaskFilters(tasks);
 
-    // ─── Derived state ─────────────────────────────────────
-    const pageStart = totalItems === 0 ? 0 : currentPage * pageSize + 1;
-    const pageEnd = totalItems === 0 ? 0 : Math.min(currentPage * pageSize + tasks.length, totalItems);
-    const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+    // ─── Infinite scroll sentinel ───────────────────────────
+    const sentinelRef = useRef<HTMLDivElement | null>(null);
+    useEffect(() => {
+        const sentinel = sentinelRef.current;
+        if (!sentinel || !onLoadMore) return;
 
+        const observer = new IntersectionObserver(
+            (entries) => {
+                if (entries[0].isIntersecting && hasNextPage && !isFetchingNextPage) {
+                    onLoadMore();
+                }
+            },
+            { threshold: 0.1 }
+        );
+        observer.observe(sentinel);
+        return () => observer.disconnect();
+    }, [hasNextPage, isFetchingNextPage, onLoadMore]);
+
+    // ─── Derived state ─────────────────────────────────────
     const { t } = useTranslation();
 
     const selectionSummary = showTaskActions && selection.selectionMode
         ? t('inbox.selectedCount', { count: selection.selectedIds.size, defaultValue: `${selection.selectedIds.size} selected` })
         : filters.hasLocalFilter
             ? t('inbox.filteredSummary', { count: filters.filteredTasks.length, total: tasks.length, defaultValue: `Showing ${filters.filteredTasks.length} of ${tasks.length} on this page` })
-            : t('inbox.paginationSummary', { start: pageStart, end: pageEnd, total: totalItems, defaultValue: `Showing ${pageStart}-${pageEnd} of ${totalItems}` });
+            : t('inbox.loadedSummary', { loaded: tasks.length, total: totalItems, defaultValue: `${tasks.length} of ${totalItems} tasks` });
 
     // ─── Loading skeleton ──────────────────────────────────
     if (isLoading) {
@@ -245,21 +260,23 @@ export function TaskList({
                                 </div>
                             </div>
                         ))}
+
+                        {/* ── Infinite Scroll Sentinel ── */}
+                        <div ref={sentinelRef} className="h-4" />
+                        {isFetchingNextPage && (
+                            <div className="flex items-center justify-center py-4 gap-2">
+                                <Loader2 className="size-4 animate-spin text-primary" />
+                                <span className="text-xs text-muted-foreground">{t('common.loadingMore', 'Loading more...')}</span>
+                            </div>
+                        )}
+                        {!hasNextPage && tasks.length > 0 && !isFetchingNextPage && (
+                            <p className="text-center text-xs text-muted-foreground py-3">
+                                {t('inbox.allTasksLoaded', 'All tasks loaded')}
+                            </p>
+                        )}
                     </div>
                 )}
             </ScrollArea>
-
-            {/* ── Pagination ── */}
-            {onPageChange && (
-                <div className={cn(isMobile && hasMobileScopeBar && 'pb-16')}>
-                    <TaskPagination
-                        currentPage={currentPage}
-                        totalPages={totalPages}
-                        isLoading={isPageLoading}
-                        onPageChange={onPageChange}
-                    />
-                </div>
-            )}
 
             {/* ── Mobile Mass Action Bar ── */}
             {showTaskActions && selection.selectionMode && isMobile && filters.filteredTasks.length > 0 && (

@@ -7,12 +7,12 @@ import type { DashboardTask } from '@/services/inbox/inbox.types';
 // ─── Status Constants ─────────────────────────────────────
 // The backend normalizes status to these display labels.
 
-export const STATUS_LABELS = ['New', 'Approved', 'Rejected'] as const;
+export const STATUS_LABELS = ['In Approving', 'Approved', 'Rejected'] as const;
 
 export const STATUS_COLORS: Record<string, string> = {
-    'New': '#f27200',         // SAP Warning Orange (previously #0070f2)
-    'Approved': '#30914c',    // SAP Success Green
-    'Rejected': '#bb0000',    // SAP Error Red
+    'In Approving': '#f27200',  // SAP Warning Orange
+    'Approved': '#30914c',      // SAP Success Green
+    'Rejected': '#bb0000',      // SAP Error Red
 };
 
 /**
@@ -28,7 +28,7 @@ export function normalizeDashboardStatus(raw: string): string {
         case 'IN_PROGRESS':
         case 'IN_PROCESS':
         case 'STARTED':
-            return 'New';
+            return 'In Approving';
         case 'APPROVED':
         case 'COMPLETED':
         case 'COMPLETE':
@@ -36,7 +36,7 @@ export function normalizeDashboardStatus(raw: string): string {
         case 'REJECTED':
             return 'Rejected';
         default:
-            return 'New'; // Default unknown statuses to New
+            return 'In Approving'; // Default unknown statuses to In Approving
     }
 }
 
