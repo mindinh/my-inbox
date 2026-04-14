@@ -82,6 +82,45 @@ export function createInboxRouter(): Router {
         });
     }));
 
+    // ─── GET /me — Current user display info ─────────────────
+    router.get('/me', asyncHandler(async (req: Request, res: Response) => {
+        const identity = resolveIdentity(req);
+        const jwtInfo = extractJwtFromRequest(req);
+        const payload = jwtInfo.token ? decodeJwtPayload(jwtInfo.token) : undefined;
+
+        let displayName: string | undefined;
+        let email: string | undefined;
+        let firstName: string | undefined;
+        let lastName: string | undefined;
+
+        if (payload) {
+            firstName = readStringClaim(payload, 'given_name');
+            lastName = readStringClaim(payload, 'family_name');
+            email = readStringClaim(payload, 'email');
+            const userName = readStringClaim(payload, 'user_name');
+
+            if (firstName && lastName) {
+                displayName = `${firstName} ${lastName}`;
+            } else if (firstName) {
+                displayName = firstName;
+            } else if (userName) {
+                displayName = userName;
+            } else if (email) {
+                // Use the part before @ as a fallback display name
+                displayName = email.split('@')[0];
+            }
+        }
+
+        res.json({
+            id: identity.btpUser,
+            sapUser: identity.sapUser,
+            displayName: displayName || identity.btpUser || 'User',
+            firstName,
+            lastName,
+            email: email || identity.btpUser,
+        });
+    }));
+
     // ─── GET /dashboard ───────────────────────────────────────
     router.get('/dashboard', asyncHandler(async (req: Request, res: Response) => {
         const { identity, appContext, sapContext } = buildInboxRequestContext(req, 'getDashboard');

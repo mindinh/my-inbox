@@ -15,7 +15,7 @@ import { useTranslation } from 'react-i18next';
 import { cn } from '@/utils/cn';
 import type { LucideIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { useTasks } from '@/pages/Inbox/hooks/inboxQueries';
+import { useCurrentUser } from '@/pages/Inbox/hooks/inboxQueries';
 
 // ── Nav config types ──────────────────────────────────────────────
 
@@ -164,8 +164,8 @@ export function MainLayout() {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const { t } = useTranslation();
   const isInWorkZone = typeof window !== 'undefined' && window.parent !== window;
-  const { data: tasksData } = useTasks({ top: 1 });
-  const username = tasksData?.identity?.btpUser || 'User';
+  const { data: userInfo } = useCurrentUser();
+  const username = userInfo?.displayName || 'User';
 
   const navTree = useNavTree();
 

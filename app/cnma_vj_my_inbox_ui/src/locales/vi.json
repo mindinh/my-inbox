@@ -69,7 +69,7 @@
         "statCards": {
             "totalTasks": "Tổng yêu cầu",
             "taskTypes": "Loại yêu cầu",
-            "new": "Mới",
+            "inApproving": "Đang duyệt",
             "approved": "Đã duyệt",
             "rejected": "Đã từ chối"
         },
@@ -155,10 +155,10 @@
         "massRejectSuccess": "Đã từ chối {{count}} công việc thành công"
     },
     "status": {
-        "new": "Mới",
-        "ready": "Mới",
-        "reserved": "Mới",
-        "inProcess": "Mới",
+        "inApproving": "Đang duyệt",
+        "ready": "Đang duyệt",
+        "reserved": "Đang duyệt",
+        "inProcess": "Đang duyệt",
         "approved": "Đã duyệt",
         "rejected": "Đã từ chối",
         "completed": "Hoàn thành",

@@ -54,3 +54,11 @@ export function invalidateAfterAttachment(
     queryClient.invalidateQueries({ queryKey: inboxKeys.taskInformation(instanceId) });
     queryClient.invalidateQueries({ queryKey: inboxKeys.taskDetail(instanceId) });
 }
+
+// ─── Policy: After uploading a PR attachment ─────────────────
+export function invalidatePrAttachments(
+    queryClient: QueryClient,
+    documentNumber: string,
+) {
+    queryClient.invalidateQueries({ queryKey: inboxKeys.prAttachments(documentNumber) });
+}

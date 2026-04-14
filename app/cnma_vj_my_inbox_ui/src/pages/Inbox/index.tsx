@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
@@ -8,13 +8,14 @@ import { TaskDetailView } from '@/pages/Inbox/components/TaskDetailView';
 import { MassSelectionView } from '@/pages/Inbox/components/MassSelectionView';
 import { TaskScopeSidebar, MobileSidebarSheet } from '@/pages/Inbox/components/TaskScopeSidebar';
 import {
-    useTasks,
-    useApprovedTasks,
+    useInfiniteTasks,
+    useInfiniteApprovedTasks,
     useTaskOverview,
     useTaskInformation,
     useTaskDetail,
     useDecision,
 } from '@/pages/Inbox/hooks/useInbox';
+import { useCurrentUser } from '@/pages/Inbox/hooks/inboxQueries';
 import type { InboxTask } from '@/services/inbox/inbox.types';
 import { useIsMobile } from '@/components/ui/use-mobile';
 
@@ -22,7 +23,6 @@ type TaskScope = 'my' | 'approved';
 
 export default function InboxPage() {
     const { t } = useTranslation();
-    const PAGE_SIZE = 5;
     const DETAIL_PREFETCH_DELAY_MS = 200;
     const { taskId } = useParams<{ taskId?: string }>();
     const navigate = useNavigate();
@@ -36,30 +36,24 @@ export default function InboxPage() {
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
     const [selectionMode, setSelectionMode] = useState(false);
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-    const [currentPage, setCurrentPage] = useState(0);
     const [detailPrefetchTaskId, setDetailPrefetchTaskId] = useState<string | null>(null);
     const isMobile = useIsMobile();
+    const { data: userInfo } = useCurrentUser();
 
-    const skip = currentPage * PAGE_SIZE;
     const isMyScope = scope === 'my';
     const showTaskActions = true;
 
-    const myTasksQuery = useTasks({
-        top: PAGE_SIZE,
-        skip,
-        enabled: isMyScope,
-    });
-    const approvedTasksQuery = useApprovedTasks({
-        top: PAGE_SIZE,
-        skip,
-        enabled: !isMyScope,
-    });
+    const myTasksQuery = useInfiniteTasks({ enabled: isMyScope });
+    const approvedTasksQuery = useInfiniteApprovedTasks({ enabled: !isMyScope });
     const activeTasksQuery = isMyScope ? myTasksQuery : approvedTasksQuery;
-    const tasksResponse = activeTasksQuery.data;
 
     // Derive performance hints from the task list item so the backend can
     // skip redundant SAP lookups and enrich in parallel.
-    const tasks = tasksResponse?.items ?? [];
+    const tasks = useMemo(
+        () => activeTasksQuery.data?.pages.flatMap((p) => p.items) ?? [],
+        [activeTasksQuery.data]
+    );
+    const totalTasks = activeTasksQuery.data?.pages[0]?.total ?? 0;
     const selectedTask = selectedTaskId
         ? tasks.find((t) => t.instanceId === selectedTaskId)
         : undefined;
@@ -115,21 +109,12 @@ export default function InboxPage() {
     });
 
     const decisionMutation = useDecision();
-    const totalTasks = tasksResponse?.total ?? 0;
     const isLoadingList = activeTasksQuery.isLoading;
     const isRefetchingList = activeTasksQuery.isRefetching;
-    const isPageLoading = activeTasksQuery.isFetching && !activeTasksQuery.isLoading;
     // Progressive merge: detail > information > overview
     const activeDetail = detailResponse?.detail ?? informationResponse?.detail ?? overviewResponse?.detail;
     const isLoadingDetail = !!selectedTaskId && isLoadingOverview && !overviewResponse?.detail;
     const isSecondaryLoading = !!selectedTaskId && shouldLoadFullDetail && !detailResponse?.detail;
-
-    useEffect(() => {
-        const totalPages = Math.max(1, Math.ceil(totalTasks / PAGE_SIZE));
-        if (currentPage > totalPages - 1) {
-            setCurrentPage(totalPages - 1);
-        }
-    }, [currentPage, totalTasks, PAGE_SIZE]);
 
     // Auto-select first task on desktop when list loads and no task is selected
     const hasAutoSelected = useRef(false);
@@ -182,7 +167,6 @@ export default function InboxPage() {
     const handleScopeChange = useCallback((nextScope: TaskScope) => {
         if (nextScope === scope) return;
         setScope(nextScope);
-        setCurrentPage(0);
         setSelectionMode(false);
         setSelectedIds(new Set());
         hasAutoSelected.current = false;
@@ -288,11 +272,10 @@ export default function InboxPage() {
                                 isLoading={isLoadingList}
                                 onRefresh={handleRefreshTasks}
                                 isRefreshing={isRefetchingList}
-                                currentPage={currentPage}
-                                pageSize={PAGE_SIZE}
                                 totalItems={totalTasks}
-                                onPageChange={setCurrentPage}
-                                isPageLoading={isPageLoading}
+                                hasNextPage={activeTasksQuery.hasNextPage}
+                                isFetchingNextPage={activeTasksQuery.isFetchingNextPage}
+                                onLoadMore={() => activeTasksQuery.fetchNextPage()}
                                 isMobile
                                 selectionMode={selectionMode}
                                 selectedIds={selectedIds}
@@ -312,7 +295,7 @@ export default function InboxPage() {
                     onClose={() => setMobileMenuOpen(false)}
                     scope={scope}
                     onScopeChange={handleScopeChange}
-                    username={tasksResponse?.identity?.btpUser}
+                    username={userInfo?.displayName}
                 />
             </div>
         );
@@ -335,11 +318,10 @@ export default function InboxPage() {
                         isLoading={isLoadingList}
                         onRefresh={handleRefreshTasks}
                         isRefreshing={isRefetchingList}
-                        currentPage={currentPage}
-                        pageSize={PAGE_SIZE}
                         totalItems={totalTasks}
-                        onPageChange={setCurrentPage}
-                        isPageLoading={isPageLoading}
+                        hasNextPage={activeTasksQuery.hasNextPage}
+                        isFetchingNextPage={activeTasksQuery.isFetchingNextPage}
+                        onLoadMore={() => activeTasksQuery.fetchNextPage()}
                         selectionMode={selectionMode}
                         selectedIds={selectedIds}
                         onSelectionModeChange={setSelectionMode}

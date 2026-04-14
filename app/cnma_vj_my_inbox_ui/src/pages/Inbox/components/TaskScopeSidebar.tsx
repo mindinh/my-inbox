@@ -1,4 +1,4 @@
-import { CheckCheck, ChevronLeft, ChevronRight, Home, Inbox, LayoutDashboard, X } from 'lucide-react';
+import { ClipboardCheck, ChevronLeft, ChevronRight, Home, Inbox, LayoutDashboard, X } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { useTranslation } from 'react-i18next';
@@ -27,7 +27,7 @@ export function useScopeItems() {
     const { t } = useTranslation();
     return [
         { value: 'my' as TaskScope, label: t('nav.myTasks'), icon: Inbox, route: '/' },
-        { value: 'approved' as TaskScope, label: t('nav.approvedTasks'), icon: CheckCheck, route: '/' },
+        { value: 'approved' as TaskScope, label: t('nav.approvedTasks'), icon: ClipboardCheck, route: '/' },
         { value: 'dashboard' as TaskScope, label: t('nav.dashboard'), icon: LayoutDashboard, route: '/dashboard' },
     ];
 }
@@ -38,7 +38,7 @@ function useMobileScopeItems() {
     return [
         { value: 'home' as TaskScope, label: t('nav.home', 'Home'), icon: Home, route: '/home' },
         { value: 'my' as TaskScope, label: t('nav.myTasks'), icon: Inbox, route: '/' },
-        { value: 'approved' as TaskScope, label: t('nav.approvedTasks'), icon: CheckCheck, route: '/' },
+        { value: 'approved' as TaskScope, label: t('nav.approvedTasks'), icon: ClipboardCheck, route: '/' },
         { value: 'dashboard' as TaskScope, label: t('nav.dashboard'), icon: LayoutDashboard, route: '/dashboard' },
     ];
 }

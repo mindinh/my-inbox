@@ -13,11 +13,29 @@ import type {
 // Keep API paths relative so Work Zone managed approuter can resolve app-local routes.
 const BASE_URL = 'api/inbox';
 
+/** Shape returned by GET /api/inbox/me */
+export interface UserInfo {
+    id: string;
+    sapUser?: string;
+    displayName: string;
+    firstName?: string;
+    lastName?: string;
+    email?: string;
+}
+
 /**
  * Inbox API — All backend calls for the inbox feature.
  * Uses the existing axiosInstance which handles CSRF tokens, auth, and error retries.
  */
 export const inboxApi = {
+    /**
+     * Get current user display info (name, email) from JWT claims.
+     */
+    getCurrentUser: async (): Promise<UserInfo> => {
+        const { data } = await axiosInstance.get<UserInfo>(`${BASE_URL}/me`);
+        return data;
+    },
+
     /**
      * Get dashboard data for the current user.
      * Returns all task records from the ZI_PR_DASH_BOARD entity.

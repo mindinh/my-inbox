@@ -15,8 +15,9 @@ import { useQueryClient } from '@tanstack/react-query';
 import {
     ActivityPanel,
     AttachmentsPanel,
-    BusinessPanel,
     CommentsPanel,
+    DetailsPanel,
+    OverviewPanel,
     StatusHeaderBadges,
     WorkflowApprovalPanel,
     makeTabDefinitions,
@@ -53,7 +54,7 @@ export function TaskDetailView({
     );
     const [tabState, setTabState] = useState<{ taskId: string; tab: string }>({
         taskId: '',
-        tab: 'business',
+        tab: 'overview',
     });
     // Track direction for mobile tab animation
     const prevTabIndexRef = useRef(0);
@@ -66,7 +67,7 @@ export function TaskDetailView({
     }, [detail, queryClient]);
 
     const activeTab =
-        detail && tabState.taskId === detail.task.instanceId ? tabState.tab : 'business';
+        detail && tabState.taskId === detail.task.instanceId ? tabState.tab : 'overview';
 
     const isPRTask = detail?.task.businessContext?.type === 'PR';
     const prDocumentId =
@@ -114,9 +115,16 @@ export function TaskDetailView({
     // Render tab content (shared between mobile & desktop)
     const renderTabContent = (tabValue: string, mobile: boolean) => {
         switch (tabValue) {
-            case 'business':
+            case 'overview':
                 return businessModel ? (
-                    <BusinessPanel model={businessModel} detail={detail} isMobile={mobile} />
+                    <OverviewPanel model={businessModel} detail={detail} isMobile={mobile} />
+                ) : null;
+            case 'details':
+                if (isSecondaryLoading && businessModel && businessModel.tables.length === 0) {
+                    return <SecondaryTabSkeleton message={t('task.loadingDetails', 'Loading details...')} />;
+                }
+                return businessModel ? (
+                    <DetailsPanel model={businessModel} detail={detail} isMobile={mobile} />
                 ) : null;
             case 'workflow':
                 return (
@@ -179,10 +187,7 @@ export function TaskDetailView({
             {/* ── Header ── */}
             {isMobile ? (
                 <div className="px-4 pt-4 pb-0 bg-slate-50/70 shrink-0">
-                    <div className="rounded-t-xl bg-white border border-x-border/40 border-t-border/40 border-b-border/40 px-4 py-4 space-y-2.5 relative z-10">
-                        {/* Row 1: Doc number + priority (left) — status badge (right) */}
-                        <StatusHeaderBadges detail={detail} />
-                        {/* Row 2: Back arrow + task title (large) */}
+                    <div className="rounded-t-xl bg-white border border-x-border/40 border-t-border/40 border-b-border/40 px-4 py-4 space-y-2 relative z-10">
                         <div className="flex items-start gap-1.5">
                             <button onClick={onBack} className="shrink-0 mt-0.5 p-1 -ml-1 rounded-md hover:bg-slate-100 transition-colors">
                                 <ArrowLeft className="size-5 text-foreground" />
@@ -191,15 +196,9 @@ export function TaskDetailView({
                                 {detail.task.title}
                             </h2>
                         </div>
-                        {/* Row 3: Task definition name ◆ Status */}
-                        {(detail.task.taskDefinitionName || detail.task.createdByName) && (
-                            <p className="text-sm text-muted-foreground pl-7">
-                                <span className="font-semibold text-foreground/80">{detail.task.taskDefinitionName}</span>
-                                {detail.task.taskDefinitionName && detail.task.status && (
-                                    <> <span className="text-muted-foreground/50">◆</span> <span>{detail.task.status}</span></>
-                                )}
-                            </p>
-                        )}
+                        <div className="pl-7">
+                            <StatusHeaderBadges detail={detail} />
+                        </div>
                     </div>
                 </div>
             ) : (
@@ -252,9 +251,16 @@ export function TaskDetailView({
 
                     <ScrollArea className="flex-1 min-h-0">
                         <div className="w-full px-5 py-4 space-y-4 pb-6">
-                            <TabsContent value="business" className="mt-0 w-full">
+                            <TabsContent value="overview" className="mt-0 w-full">
                                 {businessModel && (
-                                    <BusinessPanel model={businessModel} detail={detail} isMobile={false} />
+                                    <OverviewPanel model={businessModel} detail={detail} isMobile={false} />
+                                )}
+                            </TabsContent>
+                            <TabsContent value="details" className="mt-0 w-full">
+                                {isSecondaryLoading && businessModel && businessModel.tables.length === 0 ? (
+                                    <SecondaryTabSkeleton message={t('task.loadingDetails', 'Loading details...')} />
+                                ) : (
+                                    businessModel && <DetailsPanel model={businessModel} detail={detail} isMobile={false} />
                                 )}
                             </TabsContent>
                             <TabsContent value="workflow" className="mt-0 w-full">
@@ -464,21 +470,18 @@ function TaskDetailSkeleton({ onBack, isMobile }: { onBack: () => void; isMobile
         <div className="flex flex-col h-full">
             {isMobile ? (
                 <div className="px-4 pt-4 pb-2 bg-slate-50/70">
-                    <div className="rounded-xl bg-white border border-border/40 shadow-sm px-4 py-4 space-y-2.5">
-                        <div className="flex justify-between">
-                            <div className="flex gap-2">
-                                <Skeleton className="h-5 w-16 rounded-md" />
-                                <Skeleton className="h-5 w-12 rounded-md" />
-                            </div>
-                            <Skeleton className="h-5 w-20 rounded-md" />
-                        </div>
+                    <div className="rounded-xl bg-white border border-border/40 shadow-sm px-4 py-4 space-y-2">
                         <div className="flex items-start gap-2">
                             <button onClick={onBack} className="shrink-0 mt-0.5 p-1 -ml-1 rounded-md hover:bg-slate-100">
                                 <ArrowLeft className="size-5 text-foreground" />
                             </button>
                             <Skeleton className="h-6 w-2/3" />
                         </div>
-                        <Skeleton className="h-4 w-48 ml-7" />
+                        <div className="flex gap-2 pl-7 mt-1.5">
+                            <Skeleton className="h-5 w-24 rounded-md" />
+                            <Skeleton className="h-5 w-16 rounded-md" />
+                            <Skeleton className="h-5 w-16 rounded-md" />
+                        </div>
                     </div>
                 </div>
             ) : (

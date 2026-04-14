@@ -12,6 +12,9 @@ export const inboxKeys = {
     // ─── Dashboard ─────────────────────────────────────────
     dashboard: () => [...inboxKeys.all, 'dashboard'] as const,
 
+    // ─── Current User ──────────────────────────────────────
+    currentUser: () => [...inboxKeys.all, 'currentUser'] as const,
+
     // ─── Task Lists ────────────────────────────────────────
     tasksPrefix: () => [...inboxKeys.all, 'tasks'] as const,
     tasks: (pagination?: { top?: number; skip?: number }) =>

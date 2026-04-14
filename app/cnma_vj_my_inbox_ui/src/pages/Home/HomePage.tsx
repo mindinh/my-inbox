@@ -17,7 +17,7 @@ import { useIsMobile } from '@/components/ui/use-mobile';
 import { useDashboardQuery, normalizeDashboardStatus } from '@/pages/Dashboard/use-dashboard-data';
 import type { DashboardTask, InboxTask } from '@/services/inbox/inbox.types';
 import { TaskCard } from '@/pages/Inbox/components/TaskCard';
-import { useTasks } from '@/pages/Inbox/hooks/inboxQueries';
+import { useTasks, useCurrentUser } from '@/pages/Inbox/hooks/inboxQueries';
 
 /**
  * HomePage — Mobile-only landing page.
@@ -29,6 +29,7 @@ export default function HomePage() {
     const navigate = useNavigate();
     const isMobile = useIsMobile();
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+    const { data: userInfo } = useCurrentUser();
 
     // Redirect desktop users to inbox — home page is mobile-only
     useEffect(() => {
@@ -45,7 +46,7 @@ export default function HomePage() {
     const stats = useMemo(() => {
         const totalTasks = tasks.length;
         const newTasks = tasks.filter(
-            (t) => normalizeDashboardStatus(t.status) === 'New'
+            (t) => normalizeDashboardStatus(t.status) === 'In Approving'
         ).length;
         const approved = tasks.filter(
             (t) => normalizeDashboardStatus(t.status) === 'Approved'
@@ -111,7 +112,7 @@ export default function HomePage() {
                 >
                     <p className="text-white/80 text-base font-medium">
                         {t('home.welcomeBack', 'Welcome back')},{' '}
-                        <span className="text-white font-bold text-lg">{dashboardData?.identity?.btpUser || 'User'}</span>
+                        <span className="text-white font-bold text-lg">{userInfo?.displayName || 'User'}</span>
                     </p>
                     <p className="text-white/60 text-xs mt-1">
                         {stats.newTasks > 0
@@ -123,92 +124,92 @@ export default function HomePage() {
 
             {/* ── Stat Cards (overlapping the gradient) ──── */}
             <div className="px-4 -mt-8 relative z-10 space-y-3">
-                {/* Total Tasks — full-width card */}
+                {/* Total Tasks — full-width, Info Blue */}
                 <motion.div
                     initial={{ opacity: 0, y: 16 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.35 }}
-                    className="rounded-2xl px-5 py-4 border flex items-center justify-between"
+                    className="rounded-2xl px-5 py-4 flex items-center gap-4"
                     style={{
-                        backgroundColor: 'var(--card)',
-                        borderColor: 'var(--border)',
-                        boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+                        backgroundColor: 'var(--marketing-info-blue-bg)',
+                        border: '1.5px solid var(--marketing-info-blue-border)',
+                        boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
                     }}
                 >
-                    <div className="flex items-center gap-4">
-                        <div
-                            className="w-12 h-12 rounded-full flex items-center justify-center shrink-0"
-                            style={{ backgroundColor: 'var(--info-bg)' }}
-                        >
-                            <Layers className="w-6 h-6" style={{ color: 'var(--info)' }} />
-                        </div>
-                        <p className="text-base font-semibold" style={{ color: 'var(--info)' }}>
+                    <div
+                        className="w-12 h-12 rounded-full flex items-center justify-center shrink-0"
+                        style={{ backgroundColor: 'var(--marketing-info-blue-border)' }}
+                    >
+                        <Layers className="w-6 h-6" style={{ color: 'var(--marketing-info-blue)' }} />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                        <p className="text-sm font-semibold" style={{ color: 'var(--marketing-info-blue)' }}>
                             {t('home.totalTasks', 'Total Tasks')}
                         </p>
+                        <p className="text-3xl font-extrabold leading-tight" style={{ color: 'var(--marketing-info-blue)' }}>
+                            {isLoading ? '—' : stats.totalTasks}
+                        </p>
                     </div>
-                    <p className="text-3xl font-extrabold" style={{ color: 'var(--info)' }}>
-                        {isLoading ? '—' : stats.totalTasks}
-                    </p>
                 </motion.div>
 
-                {/* New + Approved — two half-width cards */}
-                <div className="grid grid-cols-2 gap-3 mt-3">
-                    {/* New → links to My Tasks */}
+                {/* In Approving + Approved — two half-width cards */}
+                <div className="grid grid-cols-2 gap-3">
+                    {/* In Approving → Attention Orange */}
                     <motion.div
                         initial={{ opacity: 0, y: 16 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: 0.35, delay: 0.08 }}
-                        className="rounded-2xl px-4 py-3.5 border flex items-center justify-between cursor-pointer active:scale-[0.97] transition-transform"
+                        className="rounded-2xl px-4 py-4 flex items-center gap-3 cursor-pointer active:scale-[0.97] transition-transform"
                         style={{
-                            backgroundColor: 'var(--card)',
-                            borderColor: 'var(--border)',
-                            boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+                            backgroundColor: 'var(--marketing-attention-bg)',
+                            border: '1.5px solid var(--marketing-attention-border)',
+                            boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
                         }}
                         onClick={() => navigate('/inbox', { state: { scope: 'my' } })}
                     >
-                        <div className="flex items-center gap-2.5">
-                            <div
-                                className="w-10 h-10 rounded-full flex items-center justify-center shrink-0"
-                                style={{ backgroundColor: 'var(--warning-bg)' }}
-                            >
-                                <Clock className="w-5 h-5" style={{ color: 'var(--warning)' }} />
-                            </div>
-                            <p className="text-sm font-semibold" style={{ color: 'var(--warning)' }}>
-                                {t('dashboard.statCards.new', 'New')}
+                        <div
+                            className="w-10 h-10 rounded-full flex items-center justify-center shrink-0"
+                            style={{ backgroundColor: 'var(--marketing-attention-border)' }}
+                        >
+                            <Clock className="w-5 h-5" style={{ color: 'var(--marketing-attention)' }} />
+                        </div>
+                        <div className="min-w-0">
+                            <p className="text-xs font-semibold leading-tight" style={{ color: 'var(--marketing-attention)' }}>
+                                {t('dashboard.statCards.inApproving', 'In Approving')}
+                            </p>
+                            <p className="text-2xl font-extrabold leading-tight" style={{ color: 'var(--marketing-attention)' }}>
+                                {isLoading ? '—' : stats.newTasks}
                             </p>
                         </div>
-                        <p className="text-xl font-extrabold leading-none" style={{ color: 'var(--warning)' }}>
-                            {isLoading ? '—' : stats.newTasks}
-                        </p>
                     </motion.div>
 
-                    {/* Approved → links to Approved Tasks */}
+                    {/* Approved → Positive Green */}
                     <motion.div
                         initial={{ opacity: 0, y: 16 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: 0.35, delay: 0.16 }}
-                        className="rounded-2xl px-4 py-3.5 border flex items-center justify-between cursor-pointer active:scale-[0.97] transition-transform"
+                        className="rounded-2xl px-4 py-4 flex items-center gap-3 cursor-pointer active:scale-[0.97] transition-transform"
                         style={{
-                            backgroundColor: 'var(--card)',
-                            borderColor: 'var(--border)',
-                            boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+                            backgroundColor: 'var(--marketing-positive-bg)',
+                            border: '1.5px solid var(--marketing-positive-border)',
+                            boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
                         }}
                         onClick={() => navigate('/inbox', { state: { scope: 'approved' } })}
                     >
-                        <div className="flex items-center gap-2.5">
-                            <div
-                                className="w-10 h-10 rounded-full flex items-center justify-center shrink-0"
-                                style={{ backgroundColor: 'var(--success-bg)' }}
-                            >
-                                <CheckCircle2 className="w-5 h-5" style={{ color: 'var(--success)' }} />
-                            </div>
-                            <p className="text-sm font-semibold" style={{ color: 'var(--success)' }}>
+                        <div
+                            className="w-10 h-10 rounded-full flex items-center justify-center shrink-0"
+                            style={{ backgroundColor: 'var(--marketing-positive-border)' }}
+                        >
+                            <CheckCircle2 className="w-5 h-5" style={{ color: 'var(--marketing-positive)' }} />
+                        </div>
+                        <div className="min-w-0">
+                            <p className="text-xs font-semibold leading-tight" style={{ color: 'var(--marketing-positive)' }}>
                                 {t('dashboard.statCards.approved', 'Approved')}
                             </p>
+                            <p className="text-2xl font-extrabold leading-tight" style={{ color: 'var(--marketing-positive)' }}>
+                                {isLoading ? '—' : stats.approved}
+                            </p>
                         </div>
-                        <p className="text-xl font-extrabold leading-none" style={{ color: 'var(--success)' }}>
-                            {isLoading ? '—' : stats.approved}
-                        </p>
                     </motion.div>
                 </div>
             </div>
@@ -318,7 +319,7 @@ export default function HomePage() {
                 onScopeChange={(s) => {
                     navigate('/inbox', { state: { scope: s } });
                 }}
-                username={dashboardData?.identity?.btpUser}
+                username={userInfo?.displayName}
             />
         </div>
     );

@@ -20,6 +20,8 @@ interface AttachmentPreviewCardProps {
     attachmentId: string;
     fileName?: string;
     mimeType?: string;
+    previewUrl?: string;
+    downloadUrl?: string;
     onClose: () => void;
 }
 
@@ -38,9 +40,11 @@ export function AttachmentPreviewCard({
     fileName,
     mimeType,
     onClose,
+    previewUrl: customPreviewUrl,
+    downloadUrl: customDownloadUrl,
 }: AttachmentPreviewCardProps) {
-    const previewUrl = inboxApi.getAttachmentContentUrl(instanceId, attachmentId, 'inline');
-    const downloadUrl = inboxApi.getAttachmentContentUrl(instanceId, attachmentId, 'attachment');
+    const previewUrl = customPreviewUrl || inboxApi.getAttachmentContentUrl(instanceId, attachmentId, 'inline');
+    const downloadUrl = customDownloadUrl || inboxApi.getAttachmentContentUrl(instanceId, attachmentId, 'attachment');
     const displayName = fileName || attachmentId;
 
     const previewKind = getPreviewKind(mimeType);

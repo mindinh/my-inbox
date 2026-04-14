@@ -22,7 +22,7 @@ export const INBOX_FILTER_CONFIG: FilterFieldConfig[] = [
         placeholder: 'All Status',
         visible: true,
         options: [
-            { value: 'READY', label: 'New' },
+            { value: 'READY', label: 'In Approving' },
             { value: 'RESERVED', label: 'Reserved' },
             { value: 'REJECTED', label: 'Rejected' },
         ],

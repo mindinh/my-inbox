@@ -53,7 +53,7 @@ export const MOCK_DASHBOARD_TASKS: DashboardTask[] = [
 ];
 
 export const STATUS_LABELS: Record<string, string> = {
-    NEW: 'New',
+    NEW: 'In Approving',
     APPROVED: 'Approved',
     REJECTED: 'Rejected',
 };

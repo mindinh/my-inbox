@@ -656,11 +656,11 @@ export class InboxService {
 
         // Map raw SAP shape → internal TaskAttachment model
         return rawAttachments.map((raw, index) => ({
-            id: `pr-att-${index}-${raw.File_Name || 'unknown'}`,
-            fileName: raw.File_Name,
-            fileDisplayName: raw.File_Name,
-            mimeType: raw.Mime_Type,
-            fileSize: raw.File_Size,
+            id: `pr-att-${index}-${raw.file_name || 'unknown'}`,
+            fileName: raw.file_name,
+            fileDisplayName: raw.file_name,
+            mimeType: raw.mime_type,
+            fileSize: raw.file_size,
         }));
     }
 

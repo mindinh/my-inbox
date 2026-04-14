@@ -70,7 +70,7 @@
         "statCards": {
             "totalTasks": "Total Tasks",
             "taskTypes": "Task Types",
-            "new": "New",
+            "inApproving": "In Approving",
             "approved": "Approved",
             "rejected": "Rejected"
         },
@@ -156,10 +156,10 @@
         "massRejectSuccess": "{{count}} tasks rejected successfully"
     },
     "status": {
-        "new": "New",
-        "ready": "New",
-        "reserved": "New",
-        "inProcess": "New",
+        "inApproving": "In Approving",
+        "ready": "In Approving",
+        "reserved": "In Approving",
+        "inProcess": "In Approving",
         "approved": "Approved",
         "rejected": "Rejected",
         "completed": "Completed",

@@ -11,7 +11,7 @@
  * - Own page-level UI state
  */
 import { useEffect, useRef } from 'react';
-import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useQuery, useInfiniteQuery } from '@tanstack/react-query';
 import { inboxApi } from '@/services/inbox/inbox.api';
 import { toast } from 'sonner';
 import { STALE, REFRESH } from '@/pages/Inbox/utils/constants';
@@ -42,6 +42,17 @@ function useErrorToast(error: unknown, fallback: string) {
         lastRef.current = message;
         toast.error(message);
     }, [error, fallback]);
+}
+
+// ─── useCurrentUser ────────────────────────────────────────
+export function useCurrentUser() {
+    return useQuery({
+        queryKey: inboxKeys.currentUser(),
+        queryFn: () => inboxApi.getCurrentUser(),
+        staleTime: Infinity, // User identity doesn't change mid-session
+        gcTime: Infinity,
+        retry: 1,
+    });
 }
 
 // ─── useTasks ──────────────────────────────────────────────
@@ -82,6 +93,58 @@ export function useApprovedTasks(options?: { enabled?: boolean; top?: number; sk
         placeholderData: keepPreviousData,
         refetchOnWindowFocus: true,
         refetchInterval: (q) => listRefetchInterval(q.state.error),
+        retry: (failureCount, error: any) => {
+            if (isSapUserMappingMissing(error)) return false;
+            return failureCount < 1;
+        },
+    });
+
+    useErrorToast(query.error, 'Failed to load approved tasks');
+    return query;
+}
+
+// ─── useInfiniteTasks (infinite scroll) ────────────────────
+const INFINITE_PAGE_SIZE = 10;
+
+export function useInfiniteTasks(options?: { enabled?: boolean }) {
+    const query = useInfiniteQuery({
+        queryKey: inboxKeys.tasksPrefix(),
+        queryFn: ({ pageParam = 0 }) =>
+            inboxApi.getTasks({ top: INFINITE_PAGE_SIZE, skip: pageParam }),
+        initialPageParam: 0,
+        getNextPageParam: (lastPage, allPages) => {
+            const totalFetched = allPages.reduce((sum, p) => sum + p.items.length, 0);
+            if (totalFetched >= lastPage.total) return undefined;
+            return totalFetched;
+        },
+        staleTime: STALE.LIST,
+        enabled: options?.enabled !== false,
+        refetchOnWindowFocus: true,
+        retry: (failureCount, error: any) => {
+            if (isSapUserMappingMissing(error)) return false;
+            return failureCount < 1;
+        },
+    });
+
+    useErrorToast(query.error, 'Failed to load tasks');
+    return query;
+}
+
+// ─── useInfiniteApprovedTasks (infinite scroll) ────────────
+export function useInfiniteApprovedTasks(options?: { enabled?: boolean }) {
+    const query = useInfiniteQuery({
+        queryKey: inboxKeys.approvedTasksPrefix(),
+        queryFn: ({ pageParam = 0 }) =>
+            inboxApi.getApprovedTasks({ top: INFINITE_PAGE_SIZE, skip: pageParam }),
+        initialPageParam: 0,
+        getNextPageParam: (lastPage, allPages) => {
+            const totalFetched = allPages.reduce((sum, p) => sum + p.items.length, 0);
+            if (totalFetched >= lastPage.total) return undefined;
+            return totalFetched;
+        },
+        staleTime: STALE.LIST,
+        enabled: options?.enabled !== false,
+        refetchOnWindowFocus: true,
         retry: (failureCount, error: any) => {
             if (isSapUserMappingMissing(error)) return false;
             return failureCount < 1;

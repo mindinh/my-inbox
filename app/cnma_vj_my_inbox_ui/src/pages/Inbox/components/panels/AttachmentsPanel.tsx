@@ -17,7 +17,7 @@ import { Button } from '@/components/ui/button';
 import type { TaskDetail } from '@/services/inbox/inbox.types';
 import { AttachmentPreviewCard, isPreviewableType } from '../AttachmentPreviewModal';
 import { inboxApi } from '@/services/inbox/inbox.api';
-import { useAddAttachment } from '@/pages/Inbox/hooks/useInbox';
+import { useAddAttachment, usePrAttachments, useUploadPrAttachment } from '@/pages/Inbox/hooks/useInbox';
 import { formatDate, safe } from '@/pages/Inbox/utils/formatters';
 import { formatFileSize } from '../TaskDetailSections.shared';
 import {
@@ -55,7 +55,25 @@ export function AttachmentsPanel({
     const instanceId = detail.task.instanceId;
     const isPreviewOpen = !!previewAttachment;
     const fileInputRef = useRef<HTMLInputElement>(null);
+    
+    const isPR = detail.task.businessContext?.type === 'PR';
+    const documentNumber = detail.task.businessContext?.documentId;
+    const sapOrigin = detail.task.sapOrigin;
+
+    const { data: prAttachmentsResult } = usePrAttachments(
+        isPR ? documentNumber : null,
+        sapOrigin,
+        { enabled: isPR }
+    );
+    
+    // Merge or fallback to PR attachments
+    const displayedAttachments = isPR 
+        ? (prAttachmentsResult?.attachments || [])
+        : detail.attachments;
+
     const addAttachmentMutation = useAddAttachment();
+    const uploadPrAttachmentMutation = useUploadPrAttachment();
+    const isUploading = addAttachmentMutation.isPending || uploadPrAttachmentMutation.isPending;
 
     const ALLOWED_TYPES = ALLOWED_ATTACHMENT_TYPES as readonly string[];
 
@@ -73,11 +91,33 @@ export function AttachmentsPanel({
             return;
         }
 
-        addAttachmentMutation.mutate({
-            instanceId,
-            file,
-            sapOrigin: detail.task.sapOrigin
-        });
+        if (isPR && documentNumber) {
+            uploadPrAttachmentMutation.mutate({
+                documentNumber,
+                file,
+                sapOrigin,
+            });
+        } else {
+            addAttachmentMutation.mutate({
+                instanceId,
+                file,
+                sapOrigin,
+            });
+        }
+    };
+
+    const getPreviewUrl = (attachmentId: string, fileName?: string) => {
+        if (isPR && documentNumber) {
+            return inboxApi.getPrAttachmentContentUrl(documentNumber, fileName || attachmentId, sapOrigin, 'inline');
+        }
+        return inboxApi.getAttachmentContentUrl(instanceId, attachmentId, 'inline');
+    };
+
+    const getDownloadUrl = (attachmentId: string, fileName?: string) => {
+        if (isPR && documentNumber) {
+            return inboxApi.getPrAttachmentContentUrl(documentNumber, fileName || attachmentId, sapOrigin, 'attachment');
+        }
+        return inboxApi.getAttachmentContentUrl(instanceId, attachmentId, 'attachment');
     };
 
     return (
@@ -102,23 +142,21 @@ export function AttachmentsPanel({
                     <div className="space-y-3">
                         {/* Attachment count header */}
                         <p className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--primary)' }}>
-                            {detail.attachments.length} {detail.attachments.length === 1 ? 'ATTACHMENT' : 'ATTACHMENTS'}
+                            {displayedAttachments.length} {displayedAttachments.length === 1 ? 'ATTACHMENT' : 'ATTACHMENTS'}
                         </p>
 
-                        {detail.attachments.length === 0 && (
+                        {displayedAttachments.length === 0 && (
                             <Empty message="No files attached." />
                         )}
 
-                        {detail.attachments.map((attachment) => {
+                        {displayedAttachments.map((attachment) => {
                             const fileName = safe(cleanFileName(attachment.fileName) || cleanFileName(attachment.fileDisplayName) || attachment.id);
                             const fileType = friendlyFileType(attachment.mimeType);
                             const fileSize = formatFileSize(attachment.fileSize);
                             const author = safe(attachment.createdByName || attachment.createdBy);
                             const date = formatDate(attachment.createdAt);
                             const canPreview = isPreviewableType(attachment.mimeType);
-                            const previewUrl = canPreview
-                                ? inboxApi.getAttachmentContentUrl(instanceId, attachment.id, 'inline')
-                                : undefined;
+                            const previewUrl = canPreview ? getPreviewUrl(attachment.id, fileName) : undefined;
 
                             return (
                                 <div
@@ -161,7 +199,7 @@ export function AttachmentsPanel({
                                         <button
                                             type="button"
                                             onClick={() => {
-                                                const downloadUrl = inboxApi.getAttachmentContentUrl(instanceId, attachment.id, 'attachment');
+                                                const downloadUrl = getDownloadUrl(attachment.id, fileName);
                                                 setDownloadingAttachmentId(attachment.id);
                                                 const link = document.createElement('a');
                                                 link.href = downloadUrl;
@@ -194,15 +232,15 @@ export function AttachmentsPanel({
                                 variant="outline"
                                 size="sm"
                                 onClick={() => fileInputRef.current?.click()}
-                                disabled={addAttachmentMutation.isPending}
+                                disabled={isUploading}
                                 className="w-full"
                             >
-                                {addAttachmentMutation.isPending ? (
+                                {isUploading ? (
                                     <Loader2 className="size-3.5 animate-spin mr-1.5" />
                                 ) : (
                                     <Upload className="size-3.5 mr-1.5" />
                                 )}
-                                {addAttachmentMutation.isPending ? 'Uploading...' : 'Upload Attachment'}
+                                {isUploading ? 'Uploading...' : 'Upload Attachment'}
                             </Button>
                         )}
                     </div>
@@ -220,24 +258,24 @@ export function AttachmentsPanel({
                                         variant="outline"
                                         size="sm"
                                         onClick={() => fileInputRef.current?.click()}
-                                        disabled={addAttachmentMutation.isPending}
+                                        disabled={isUploading}
                                         className="shrink-0"
                                     >
-                                        {addAttachmentMutation.isPending ? (
+                                        {isUploading ? (
                                             <Loader2 className="size-3.5 animate-spin" />
                                         ) : (
                                             <Upload className="size-3.5" />
                                         )}
-                                        {addAttachmentMutation.isPending ? 'Uploading...' : 'Upload'}
+                                        {isUploading ? 'Uploading...' : 'Upload'}
                                     </Button>
                                 )}
                             </div>
                         </CardHeader>
                         <CardContent className="flex-1 overflow-y-auto pb-4 space-y-2">
-                            {detail.attachments.length === 0 && (
+                            {displayedAttachments.length === 0 && (
                                 <Empty message="No files attached." />
                             )}
-                            {detail.attachments.map((attachment) => (
+                            {displayedAttachments.map((attachment) => (
                                 <div
                                     key={attachment.id}
                                     className={cn(
@@ -292,7 +330,7 @@ export function AttachmentsPanel({
                                             type="button"
                                             onClick={() => {
                                                 const fName = cleanFileName(attachment.fileName) || cleanFileName(attachment.fileDisplayName);
-                                                const downloadUrl = inboxApi.getAttachmentContentUrl(instanceId, attachment.id, 'attachment');
+                                                const downloadUrl = getDownloadUrl(attachment.id, fName);
                                                 setDownloadingAttachmentId(attachment.id);
                                                 const toastId = toast.loading('Preparing file for download...');
                                                 const link = document.createElement('a');
@@ -348,6 +386,8 @@ export function AttachmentsPanel({
                                 attachmentId={previewAttachment.id}
                                 fileName={previewAttachment.fileName}
                                 mimeType={previewAttachment.mimeType}
+                                previewUrl={getPreviewUrl(previewAttachment.id, previewAttachment.fileName)}
+                                downloadUrl={getDownloadUrl(previewAttachment.id, previewAttachment.fileName)}
                                 onClose={() => setPreviewAttachment(null)}
                             />
                         </motion.div>

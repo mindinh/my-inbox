@@ -78,7 +78,7 @@ export function WorkflowApprovalPanel({
                         if (isCompleted) {
                             lineClasses = "bg-emerald-500 w-[2px]";
                         } else if (isCurrent) {
-                            lineClasses = "border-l-[2px] border-dotted border-blue-400 w-[2px]";
+                            lineClasses = "border-l-[2px] border-dotted border-orange-300 w-[2px]";
                         } else {
                             lineClasses = "border-l-[2px] border-dotted border-slate-200 w-[2px]";
                         }
@@ -99,7 +99,7 @@ export function WorkflowApprovalPanel({
                                                 <CheckCircle2 className="size-[15px]" />
                                             </div>
                                         ) : isCurrent ? (
-                                            <div className="flex items-center justify-center size-[26px] rounded-full bg-blue-600 text-white shadow-[0_0_12px_rgba(37,99,235,0.25)] ring-4 ring-white font-medium text-xs">
+                                            <div className="flex items-center justify-center size-[26px] rounded-full bg-yellow-100 text-orange-500 ring-4 ring-white font-medium text-xs">
                                                 <Loader2 className="size-[14px] animate-spin" />
                                             </div>
                                         ) : (
@@ -115,9 +115,14 @@ export function WorkflowApprovalPanel({
 
                                 {/* Content block */}
                                 <div className="flex-1 pb-8 min-w-0">
+                                    <div className="text-[12px] text-muted-foreground font-medium mb-1 mt-0.5">
+                                        Level {step.level}
+                                        {step.releaseCode && <span className="mx-1.5">•</span>}
+                                        {step.releaseCode && <span>Code {step.releaseCode}</span>}
+                                    </div>
                                     <div className="flex items-start justify-between">
                                         <h4 className={cn(
-                                            "text-base flex items-center gap-2 font-semibold truncate mb-1.5 mt-1",
+                                            "text-base flex items-center gap-2 font-semibold truncate mb-1.5",
                                             isCurrent ? "text-foreground" : "text-slate-700",
                                             isPending && "text-slate-500"
                                         )}>
@@ -140,7 +145,7 @@ export function WorkflowApprovalPanel({
                                             <span className="text-muted-foreground w-16 shrink-0">Status:</span>
                                             <span className={cn(
                                                 "font-medium",
-                                                isCompleted ? "text-emerald-600" : (isCurrent ? "text-blue-600" : "text-slate-500")
+                                                isCompleted ? "text-emerald-600" : (isCurrent ? "text-orange-500" : "text-slate-500")
                                             )}>
                                                 {formatApprovalStatus(statusRaw)}
                                             </span>

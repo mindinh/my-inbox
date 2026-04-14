@@ -28,10 +28,15 @@ interface SapPrCommentRaw {
 
 /** Raw shape from SAP ZI_PR_ATTACH_TAB entity */
 export interface SapPrAttachmentRaw {
-    File_Name?: string;
-    Mime_Type?: string;
-    File_Content?: string; // Base64-encoded binary
-    File_Size?: number;
+    doc_num?: string;
+    attach_id?: string;
+    file_name?: string;
+    mime_type?: string;
+    file_content?: string; // Base64-encoded binary
+    file_size?: number;
+    created_by?: string;
+    created_on?: string;
+    created_time?: string;
 }
 interface ApprovalTreeConfig {
     servicePath: string;
@@ -235,9 +240,10 @@ export class SapPurchaseRequisitionApprovalTreeClient {
         try {
             const response = await this.get<ODataV4Collection<SapPrAttachmentRaw>>(
                 config,
-                `/ZI_PR_ATTACH_TAB(doc_num='${escapedDocNum}')`,
+                `/ZI_PR_ATTACHMENTS`,
                 {
-                    '$select': 'File_Name,Mime_Type,File_Size',
+                    '$filter': `doc_num eq '${escapedDocNum}'`,
+                    '$select': 'file_name,mime_type,file_size,created_by,created_on,created_time',
                     'sap-client': this.sapClient,
                 },
                 options?.userJwt
@@ -271,26 +277,26 @@ export class SapPurchaseRequisitionApprovalTreeClient {
         try {
             const response = await this.get<ODataV4Collection<SapPrAttachmentRaw>>(
                 config,
-                `/ZI_PR_ATTACH_TAB(doc_num='${escapedDocNum}')`,
+                `/ZI_PR_ATTACHMENTS`,
                 {
-                    '$filter': `File_Name eq '${this.escapeODataString(fileName)}'`,
+                    '$filter': `doc_num eq '${escapedDocNum}' and file_name eq '${this.escapeODataString(fileName)}'`,
                     'sap-client': this.sapClient,
                 },
                 options?.userJwt
             );
 
             const items = response.value || [];
-            const attachment = items.find((a) => a.File_Name === fileName);
-            if (!attachment || !attachment.File_Content) {
+            const attachment = items.find((a) => a.file_name === fileName);
+            if (!attachment || !attachment.file_content) {
                 console.warn(`[SapPRApprovalTree] Attachment content not found for ${fileName} in PR ${docNum}`);
                 return null;
             }
 
-            // Convert Base64 File_Content → Buffer
-            const data = Buffer.from(attachment.File_Content, 'base64');
-            const contentType = attachment.Mime_Type || 'application/octet-stream';
+            // Convert Base64 file_content → Buffer
+            const data = Buffer.from(attachment.file_content, 'base64');
+            const contentType = attachment.mime_type || 'application/octet-stream';
 
-            return { data, contentType, fileName: attachment.File_Name || fileName };
+            return { data, contentType, fileName: attachment.file_name || fileName };
         } catch (error) {
             console.warn(`[SapPRApprovalTree] Failed to fetch PR Attachment content for ${fileName} in PR ${docNum}: ${error instanceof Error ? error.message : String(error)}`);
             return null;

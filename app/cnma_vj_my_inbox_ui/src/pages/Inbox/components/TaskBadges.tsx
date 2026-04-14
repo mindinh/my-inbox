@@ -26,7 +26,7 @@ export function PriorityBadge({ priority }: { priority?: string }) {
     const translatedLabel = mappedKey ? (t(`priority.${mappedKey}`) as string) : fallbackLabel;
 
     return (
-        <Badge variant={variant as any} className="px-2 py-0.5 text-[11px] font-semibold">
+        <Badge variant={variant as any} className="px-2.5 py-0.5 text-[13px] font-normal">
             {translatedLabel}
         </Badge>
     );
@@ -56,12 +56,13 @@ export function StatusBadge({ status }: { status?: string }) {
     };
 
     const statusKeyMap: Record<string, string> = {
-        NEW: 'new',
-        READY: 'new',
-        RESERVED: 'new',
-        IN_PROGRESS: 'new',
-        IN_PROCESS: 'new',
-        STARTED: 'new',
+        NEW: 'inApproving',
+        READY: 'inApproving',
+        RESERVED: 'inApproving',
+        IN_PROGRESS: 'inApproving',
+        IN_PROCESS: 'inApproving',
+        IN_APPROVING: 'inApproving',
+        STARTED: 'inApproving',
         COMPLETED: 'completed',
         COMPLETE: 'completed',
         APPROVED: 'approved',
@@ -75,7 +76,7 @@ export function StatusBadge({ status }: { status?: string }) {
     const translatedLabel = mappedKey ? (t(`status.${mappedKey}`) as string) : fallbackLabel;
 
     return (
-        <Badge variant={variant as any} className="px-2.5 py-0.5 text-[11px] font-bold">
+        <Badge variant={variant as any} className="px-2.5 py-0.5 text-[13px] font-normal">
             {translatedLabel}
         </Badge>
     );
