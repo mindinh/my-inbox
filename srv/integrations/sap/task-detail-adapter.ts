@@ -25,7 +25,6 @@ import {
     normalizeDescription,
     normalizeCustomAttributes,
     normalizeTaskObjects,
-    normalizeAttachments,
 } from './task-mapper';
 import { classifyAndWrapError } from './task-error-mapper';
 import type { AdapterContext } from './task-transport-utils';
@@ -33,6 +32,7 @@ import { decodeURIComponentSafeDeep, withAdapterLogging } from './task-transport
 import type {
     TaskDetailBundle,
     TaskInformationBundle,
+    TaskOverviewBundle,
     AttachmentStreamResult,
 } from '../../domain/inbox/inbox-task.models';
 
@@ -133,7 +133,7 @@ export class TaskDetailAdapter {
                     comments: [],
                     processingLogs: [],
                     workflowLogs: [],
-                    attachments: normalizeAttachments(rawTask.Attachments?.results || []),
+                    attachments: [], // Attachments decoupled — fetched via standalone PR API
                     sapIdentifiers: {
                         instanceId,
                         sapOrigin: rawTask.SAP__Origin,
@@ -204,6 +204,66 @@ export class TaskDetailAdapter {
                 };
             } catch (error) {
                 throw classifyAndWrapError(error, 'task.detail.fetchTaskInformation');
+            }
+        });
+    }
+
+    /**
+     * Fetch ultra-lightweight task overview for the fastest possible first render.
+     *
+     * Uses the overview-only SAP $batch (3 segments instead of 5) which excludes
+     * the heavy TaskObjects and Attachments queries. Those segments are loaded
+     * in the background by the frontend after the overview renders.
+     */
+    async fetchTaskOverview(
+        context: AdapterContext,
+        instanceId: string,
+        hints?: TaskDetailClientHints
+    ): Promise<TaskOverviewBundle> {
+        return withAdapterLogging(MODULE, 'fetchTaskOverview', async () => {
+            try {
+                const rawTask = await this.sapClient.fetchTaskOverviewBundle(
+                    context.sapUser,
+                    instanceId,
+                    context.userJwt,
+                    hints?.sapOrigin ? { sapOrigin: hints.sapOrigin } : undefined
+                );
+
+                // Resolve attribute definitions: cache → SAP fetch
+                let attrDefinitions: SapCustomAttributeDefinitionRaw[] = [];
+                if (rawTask.TaskDefinitionID) {
+                    const cached = getCachedAttrDefs(rawTask.TaskDefinitionID);
+                    if (cached) {
+                        attrDefinitions = cached;
+                        console.log(`[TaskDetailAdapter] AttrDef cache hit for ${rawTask.TaskDefinitionID}`);
+                    } else {
+                        attrDefinitions = await this.sapClient
+                            .fetchCustomAttributeDefinitions(
+                                context.sapUser,
+                                rawTask.TaskDefinitionID,
+                                context.userJwt
+                            )
+                            .catch(() => []);
+                        setCachedAttrDefs(rawTask.TaskDefinitionID, attrDefinitions);
+                    }
+                }
+
+                return {
+                    task: normalizeTask(rawTask),
+                    decisions: normalizeDecisions(rawTask.DecisionOptions?.results || []),
+                    description: normalizeDescription(rawTask.Description || null),
+                    customAttributes: normalizeCustomAttributes(
+                        rawTask.CustomAttributeData?.results || [],
+                        attrDefinitions
+                    ),
+                    sapIdentifiers: {
+                        instanceId,
+                        sapOrigin: rawTask.SAP__Origin,
+                        taskDefinitionId: rawTask.TaskDefinitionID,
+                    },
+                };
+            } catch (error) {
+                throw classifyAndWrapError(error, 'task.detail.fetchTaskOverview');
             }
         });
     }

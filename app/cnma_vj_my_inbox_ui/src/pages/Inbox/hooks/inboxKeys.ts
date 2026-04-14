@@ -22,6 +22,7 @@ export const inboxKeys = {
         [...inboxKeys.all, 'approvedTasks', pagination ?? {}] as const,
 
     // ─── Task Detail ───────────────────────────────────────
+    taskOverview: (id: string) => [...inboxKeys.all, 'task-overview', id] as const,
     taskInformation: (id: string) => [...inboxKeys.all, 'task-information', id] as const,
     taskDetail: (id: string) => [...inboxKeys.all, 'task', id] as const,
 
@@ -31,4 +32,8 @@ export const inboxKeys = {
         id: string,
         params?: { documentId?: string; sapOrigin?: string }
     ) => [...inboxKeys.all, 'workflow', id, params ?? {}] as const,
+
+    // ─── PR Attachments ────────────────────────────────────
+    prAttachments: (documentNumber: string, sapOrigin?: string) =>
+        [...inboxKeys.all, 'pr-attachments', documentNumber, sapOrigin ?? ''] as const,
 };

@@ -13,7 +13,7 @@ import {
     SapAttachmentRaw,
 } from '../../types';
 import { executeHttpRequest } from '@sap-cloud-sdk/http-client';
-import { executeTaskDetailBatch } from '../helpers/task-detail-batch';
+import { executeTaskDetailBatch, executeTaskOverviewBatch } from '../helpers/task-detail-batch';
 import { resolveAuthRuntimeConfig } from '../../core/config/auth-mode';
 
 /**
@@ -32,6 +32,9 @@ export interface ISapTaskClient {
 
     /** Fetch task detail with all supported navigation properties expanded */
     fetchTaskDetailBundle(sapUser: string, instanceId: string, userJwt?: string, hints?: { sapOrigin?: string }): Promise<SapTaskRaw>;
+
+    /** Fetch lightweight overview bundle (Description + CustomAttributeData + DecisionOptions only) */
+    fetchTaskOverviewBundle(sapUser: string, instanceId: string, userJwt?: string, hints?: { sapOrigin?: string }): Promise<SapTaskRaw>;
 
     /** Fetch decision options for a task */
     fetchDecisionOptions(sapUser: string, instanceId: string, userJwt?: string): Promise<SapDecisionOptionRaw[]>;
@@ -336,11 +339,63 @@ export class SapTaskClient implements ISapTaskClient {
         task.Description = batchData.description || undefined;
         task.CustomAttributeData = { results: batchData.customAttributes };
         task.TaskObjects = { results: batchData.taskObjects };
-        task.Attachments = { results: batchData.attachments };
+        task.Attachments = { results: [] }; // Attachments fetched via standalone PR API
         task.DecisionOptions = { results: batchData.decisionOptions };
-        if ((batchData.attachments?.length || 0) > 0) {
-            task.HasAttachments = true;
+
+        return task;
+    }
+
+    /**
+     * Fetch lightweight overview bundle — only Description, CustomAttributeData,
+     * and DecisionOptions. Excludes heavy TaskObjects and Attachments to cut
+     * SAP Gateway processing time for the initial task overview render.
+     */
+    async fetchTaskOverviewBundle(
+        sapUser: string,
+        instanceId: string,
+        userJwt?: string,
+        hints?: { sapOrigin?: string }
+    ): Promise<SapTaskRaw> {
+        const effectiveSapUser = this.resolveSapUser(sapUser);
+
+        let task: SapTaskRaw | null = null;
+        let origin: string;
+        let taskEntityPath: string;
+
+        if (hints?.sapOrigin) {
+            origin = hints.sapOrigin;
+            taskEntityPath = this.taskCollectionKey(origin, instanceId);
+            console.log(`[SapTaskClient] Overview fast path: skipping origin lookup (sapOrigin=${origin})`);
+        } else {
+            task = await this.fetchTaskByFilter(effectiveSapUser, instanceId, undefined, userJwt);
+            if (!task) {
+                throw new Error(`Task ${instanceId} not found in SAP TASKPROCESSING.`);
+            }
+            origin = task.SAP__Origin || this.sapOrigin;
+            taskEntityPath = this.resolveTaskEntityPath(task, origin, instanceId);
         }
+
+        const batchData = await this.fetchTaskOverviewSegmentsBatch(
+            effectiveSapUser,
+            instanceId,
+            origin,
+            taskEntityPath,
+            userJwt
+        );
+
+        if (!task) {
+            task = {
+                InstanceID: instanceId,
+                SAP__Origin: origin,
+            } as SapTaskRaw;
+        }
+
+        task.Description = batchData.description || undefined;
+        task.CustomAttributeData = { results: batchData.customAttributes };
+        task.DecisionOptions = { results: batchData.decisionOptions };
+        // TaskObjects/Attachments intentionally omitted for overview speed
+        task.TaskObjects = { results: [] };
+        task.Attachments = { results: [] };
 
         return task;
     }
@@ -566,11 +621,52 @@ export class SapTaskClient implements ISapTaskClient {
         description: SapDescriptionRaw | null;
         customAttributes: SapCustomAttributeRaw[];
         taskObjects: SapTaskObjectRaw[];
-        attachments: SapAttachmentRaw[];
         decisionOptions: SapDecisionOptionRaw[];
     }> {
         const sapClient = process.env.SAP_TASK_CLIENT || '400';
         return executeTaskDetailBatch({
+            instanceId,
+            sapOrigin,
+            sapClient,
+            taskEntityPath,
+            sendBatch: async (payload, boundary) => {
+                const response = await this.request<string>({
+                    sapUser,
+                    userJwt,
+                    method: 'POST',
+                    path: '/$batch',
+                    data: payload,
+                    headers: {
+                        Accept: 'multipart/mixed',
+                        'Content-Type': `multipart/mixed; boundary=${boundary}`,
+                        'Content-Length': String(payload.byteLength),
+                    },
+                    responseType: 'text',
+                    appendSapClient: false,
+                });
+                return { data: response.data, headers: response.headers };
+            },
+            logWarning: (message) => console.warn(`[SapTaskClient] ${message}`),
+        });
+    }
+
+    /**
+     * Lightweight overview-only batch — excludes heavy TaskObjects and Attachments.
+     * Returns Description, CustomAttributeData, and DecisionOptions only.
+     */
+    private async fetchTaskOverviewSegmentsBatch(
+        sapUser: string,
+        instanceId: string,
+        sapOrigin: string,
+        taskEntityPath: string,
+        userJwt?: string
+    ): Promise<{
+        description: SapDescriptionRaw | null;
+        customAttributes: SapCustomAttributeRaw[];
+        decisionOptions: SapDecisionOptionRaw[];
+    }> {
+        const sapClient = process.env.SAP_TASK_CLIENT || '400';
+        return executeTaskOverviewBatch({
             instanceId,
             sapOrigin,
             sapClient,

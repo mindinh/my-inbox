@@ -10,6 +10,7 @@ import { TaskScopeSidebar, MobileSidebarSheet } from '@/pages/Inbox/components/T
 import {
     useTasks,
     useApprovedTasks,
+    useTaskOverview,
     useTaskInformation,
     useTaskDetail,
     useDecision,
@@ -70,19 +71,23 @@ export default function InboxPage() {
           }
         : undefined;
 
+    // ─── Stage 1: Ultra-lightweight overview (3-segment batch) ───
+    // Fetches Description, CustomAttributes, DecisionOptions only.
     const {
-        data: informationResponse,
-        isLoading: isLoadingInformation,
-    } = useTaskInformation(selectedTaskId, { hints: informationHints });
+        data: overviewResponse,
+        isLoading: isLoadingOverview,
+    } = useTaskOverview(selectedTaskId, { hints: informationHints });
 
+    // ─── Stage 2: Background enrichment with TaskObjects/Attachments ───
+    // Once overview is rendered, trigger the 5-segment batch in background.
     useEffect(() => {
         setDetailPrefetchTaskId(null);
     }, [selectedTaskId]);
 
     useEffect(() => {
         if (!selectedTaskId) return;
-        const infoTaskId = informationResponse?.detail?.task.instanceId;
-        if (infoTaskId !== selectedTaskId) return;
+        const overviewTaskId = overviewResponse?.detail?.task.instanceId;
+        if (overviewTaskId !== selectedTaskId) return;
 
         const timer = window.setTimeout(() => {
             setDetailPrefetchTaskId((current) =>
@@ -93,12 +98,20 @@ export default function InboxPage() {
         return () => {
             window.clearTimeout(timer);
         };
-    }, [selectedTaskId, informationResponse?.detail?.task.instanceId, DETAIL_PREFETCH_DELAY_MS]);
+    }, [selectedTaskId, overviewResponse?.detail?.task.instanceId, DETAIL_PREFETCH_DELAY_MS]);
 
     const shouldLoadFullDetail = !!selectedTaskId && detailPrefetchTaskId === selectedTaskId;
 
-    const { data: detailResponse } = useTaskDetail(selectedTaskId, {
+    // useTaskInformation now serves as the "enriched" second-tier, fetching
+    // TaskObjects + Attachments that were excluded from the overview.
+    const { data: informationResponse } = useTaskInformation(selectedTaskId, {
         enabled: shouldLoadFullDetail,
+        hints: informationHints,
+    });
+
+    // Stage 3: Full detail (comments, logs) — deepest tier
+    const { data: detailResponse } = useTaskDetail(selectedTaskId, {
+        enabled: shouldLoadFullDetail && !!informationResponse?.detail,
     });
 
     const decisionMutation = useDecision();
@@ -106,8 +119,9 @@ export default function InboxPage() {
     const isLoadingList = activeTasksQuery.isLoading;
     const isRefetchingList = activeTasksQuery.isRefetching;
     const isPageLoading = activeTasksQuery.isFetching && !activeTasksQuery.isLoading;
-    const activeDetail = detailResponse?.detail ?? informationResponse?.detail;
-    const isLoadingDetail = !!selectedTaskId && isLoadingInformation && !informationResponse?.detail;
+    // Progressive merge: detail > information > overview
+    const activeDetail = detailResponse?.detail ?? informationResponse?.detail ?? overviewResponse?.detail;
+    const isLoadingDetail = !!selectedTaskId && isLoadingOverview && !overviewResponse?.detail;
     const isSecondaryLoading = !!selectedTaskId && shouldLoadFullDetail && !detailResponse?.detail;
 
     useEffect(() => {

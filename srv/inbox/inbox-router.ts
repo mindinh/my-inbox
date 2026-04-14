@@ -110,7 +110,27 @@ export function createInboxRouter(): Router {
         res.json(result);
     }));
 
-    // ─── GET /tasks/:id ───────────────────────────────────
+    // ─── GET /tasks/:id/overview (fast-path, 3-segment batch) ─────
+    router.get('/tasks/:id/overview', asyncHandler(async (req: Request, res: Response) => {
+        const { identity, appContext, sapContext } = buildInboxRequestContext(req, 'getTaskOverview');
+        const service = getInboxService();
+        const id = req.params.id as string;
+
+        const clientHints = {
+            sapOrigin: req.query.sapOrigin as string | undefined,
+            documentId: req.query.documentId as string | undefined,
+            businessObjectType: req.query.businessObjectType as string | undefined,
+        };
+        const hasHints = clientHints.sapOrigin || clientHints.documentId;
+
+        const result = await service.getTaskOverview(
+            identity, id, { appContext, sapContext },
+            hasHints ? clientHints : undefined
+        );
+        res.json(result);
+    }));
+
+    // ─── GET /tasks/:id/information (backward-compat, 5-segment batch) ─────
     router.get('/tasks/:id/information', asyncHandler(async (req: Request, res: Response) => {
         const { identity, appContext, sapContext } = buildInboxRequestContext(req, 'getTaskInformation');
         const service = getInboxService();
@@ -252,6 +272,74 @@ export function createInboxRouter(): Router {
             }
 
             const result = await service.addAttachment(identity, id, fileName, mimeType, buffer, sapOrigin);
+            res.json(result);
+        })
+    );
+
+    // ─── PR Attachment Endpoints (Standalone API) ─────────
+
+    // GET /pr/:docNum/attachments — List PR attachment metadata
+    router.get('/pr/:docNum/attachments', asyncHandler(async (req: Request, res: Response) => {
+        const identity = resolveAndValidateIdentity(req);
+        const service = getInboxService();
+        const docNum = req.params.docNum as string;
+        const sapOrigin = req.query.sapOrigin as string | undefined;
+
+        const attachments = await service.getPrAttachments(identity, docNum, sapOrigin);
+        res.json({ attachments, count: attachments.length });
+    }));
+
+    // GET /pr/:docNum/attachments/:fileName/content — Download PR attachment content
+    router.get('/pr/:docNum/attachments/:fileName/content', asyncHandler(async (req: Request, res: Response) => {
+        const identity = resolveAndValidateIdentity(req);
+        const service = getInboxService();
+        const docNum = req.params.docNum as string;
+        const fileName = decodeURIComponent(req.params.fileName as string);
+        const sapOrigin = req.query.sapOrigin as string | undefined;
+        const disposition = (req.query.disposition as string) || 'inline';
+
+        const { data, contentType, fileName: resolvedFileName } =
+            await service.streamPrAttachmentContent(identity, docNum, fileName, sapOrigin);
+
+        res.setHeader('Content-Type', contentType);
+        if (resolvedFileName) {
+            const dispositionType = disposition === 'attachment' ? 'attachment' : 'inline';
+            res.setHeader('Content-Disposition', `${dispositionType}; filename="${encodeURIComponent(resolvedFileName)}"`);
+        }
+        res.setHeader('Content-Length', data.byteLength);
+        res.send(data);
+    }));
+
+    // POST /pr/:docNum/attachments — Upload PR attachment
+    router.post(
+        '/pr/:docNum/attachments',
+        express.raw({ limit: '10mb', type: '*/*' }),
+        asyncHandler(async (req: Request, res: Response) => {
+            const identity = resolveAndValidateIdentity(req);
+            const service = getInboxService();
+            const docNum = req.params.docNum as string;
+
+            const slug = req.headers['slug'] as string | undefined;
+            const fileName = slug ? decodeURIComponent(slug) : `upload-${Date.now()}`;
+            const mimeType = (req.headers['content-type'] as string) || 'application/octet-stream';
+            const sapOrigin = req.headers['x-sap-origin'] as string | undefined;
+
+            const buffer = Buffer.isBuffer(req.body)
+                ? req.body
+                : Buffer.from(req.body as ArrayBuffer);
+
+            if (!buffer.byteLength) {
+                res.status(400).json({
+                    success: false,
+                    error: 'Empty file body.',
+                    code: 'VALIDATION_ERROR',
+                });
+                return;
+            }
+
+            const result = await service.uploadPrAttachment(
+                identity, docNum, fileName, mimeType, buffer, sapOrigin
+            );
             res.json(result);
         })
     );

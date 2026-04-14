@@ -68,6 +68,7 @@ export const STALE = {
     LIST: 30_000,
     DETAIL: 15_000,
     INFORMATION: 20_000,
+    OVERVIEW: 20_000,
     WORKFLOW: 60_000,
 } as const;
 

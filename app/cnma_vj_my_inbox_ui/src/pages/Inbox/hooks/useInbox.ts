@@ -18,6 +18,7 @@ export { inboxKeys } from './inboxKeys';
 export {
     useTasks,
     useApprovedTasks,
+    useTaskOverview,
     useTaskInformation,
     useTaskDetail,
     useWorkflowApprovalTree,

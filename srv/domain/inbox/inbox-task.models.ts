@@ -80,6 +80,19 @@ export interface TaskInformationBundle {
     sapIdentifiers: SAPTaskIdentifiers;
 }
 
+/**
+ * Ultra-lightweight overview bundle for fastest first render.
+ * Excludes taskObjects entirely — they are fetched in the background.
+ */
+export interface TaskOverviewBundle {
+    task: InboxTask;
+    decisions: Decision[];
+    description?: TaskDescription;
+    customAttributes: CustomAttribute[];
+    /** SAP identifiers needed for downstream business context resolution */
+    sapIdentifiers: SAPTaskIdentifiers;
+}
+
 /** Raw attachment streaming result from detail adapter. */
 export interface AttachmentStreamResult {
     data: Buffer;

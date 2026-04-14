@@ -349,7 +349,7 @@ export default function DashboardPage() {
             {/* Mobile App Header — gradient background */}
             {isMobile && (
                 <div
-                    className="px-4 py-3 flex items-center shadow-sm relative z-20 shrink-0"
+                    className="px-4 py-3 flex items-center shadow-sm relative z-20 shrink-0 w-full"
                     style={{ background: 'linear-gradient(135deg, var(--primary) 0%, var(--primary-hover) 100%)' }}
                 >
                     <button
@@ -359,7 +359,7 @@ export default function DashboardPage() {
                     >
                         <Menu size={22} className="text-white" />
                     </button>
-                    <h1 className="text-lg font-bold text-white tracking-wide">
+                    <h1 className="text-lg font-bold text-white tracking-wide text-center">
                         {t('nav.dashboard', 'Dashboard')}
                     </h1>
                 </div>
@@ -379,13 +379,13 @@ export default function DashboardPage() {
                                 </p>
                             </div>
                         )}
-                        {isMobile && (
+                        {/* {isMobile && (
                             <div>
                                 <h2 className="text-lg font-bold" style={{ color: 'var(--foreground)' }}>
                                     {t('dashboard.title')}
                                 </h2>
                             </div>
-                        )}
+                        )} */}
                     </div>
                     {hasFilters && (
                         <button

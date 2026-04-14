@@ -1,5 +1,4 @@
 import {
-    SapAttachmentRaw,
     SapCustomAttributeRaw,
     SapDecisionOptionRaw,
     SapDescriptionRaw,
@@ -25,7 +24,6 @@ export interface TaskDetailBatchResult {
     description: SapDescriptionRaw | null;
     customAttributes: SapCustomAttributeRaw[];
     taskObjects: SapTaskObjectRaw[];
-    attachments: SapAttachmentRaw[];
     decisionOptions: SapDecisionOptionRaw[];
 }
 
@@ -67,12 +65,6 @@ export async function executeTaskDetailBatch(options: {
             optional: true,
         },
         {
-            key: 'Attachments',
-            url: `${taskEntityPath}/Attachments?sap-client=${sapClient}`,
-            kind: 'collection',
-            optional: true,
-        },
-        {
             key: 'DecisionOptions',
             url: `DecisionOptions?sap-client=${sapClient}&SAP__Origin='${escapedOrigin}'&InstanceID='${escapedInstanceId}'`,
             kind: 'collection',
@@ -97,7 +89,6 @@ export async function executeTaskDetailBatch(options: {
     let description: SapDescriptionRaw | null = null;
     let customAttributes: SapCustomAttributeRaw[] = [];
     let taskObjects: SapTaskObjectRaw[] = [];
-    let attachments: SapAttachmentRaw[] = [];
     let decisionOptions: SapDecisionOptionRaw[] = [];
 
     for (let i = 0; i < specs.length; i += 1) {
@@ -126,9 +117,6 @@ export async function executeTaskDetailBatch(options: {
             case 'TaskObjects':
                 taskObjects = parseBatchCollection<SapTaskObjectRaw>(part.body);
                 break;
-            case 'Attachments':
-                attachments = parseBatchCollection<SapAttachmentRaw>(part.body);
-                break;
             case 'DecisionOptions':
                 decisionOptions = parseBatchCollection<SapDecisionOptionRaw>(part.body);
                 break;
@@ -141,7 +129,6 @@ export async function executeTaskDetailBatch(options: {
         description,
         customAttributes,
         taskObjects,
-        attachments,
         decisionOptions,
     };
 }
@@ -268,4 +255,111 @@ function firstHeaderValue(headers: HeaderMap, key: string): string | undefined {
     const value = headers[key.toLowerCase()];
     if (!value) return undefined;
     return Array.isArray(value) ? value[0] : value;
+}
+
+// ─── Overview-only Batch ──────────────────────────────────
+// Lightweight batch that fetches only the three segments needed for
+// the first "Overview" render: Description, CustomAttributeData,
+// and DecisionOptions. Excludes heavy TaskObjects and Attachments
+// to cut total SAP Gateway processing time roughly in half.
+
+export interface TaskOverviewBatchResult {
+    description: SapDescriptionRaw | null;
+    customAttributes: SapCustomAttributeRaw[];
+    decisionOptions: SapDecisionOptionRaw[];
+}
+
+export async function executeTaskOverviewBatch(options: {
+    instanceId: string;
+    sapOrigin: string;
+    sapClient: string;
+    taskEntityPath: string;
+    sendBatch: (payload: Buffer, boundary: string) => Promise<{ data: unknown; headers: HeaderMap }>;
+    logWarning?: (message: string) => void;
+}): Promise<TaskOverviewBatchResult> {
+    const {
+        instanceId,
+        sapOrigin,
+        sapClient,
+        taskEntityPath,
+        sendBatch,
+        logWarning,
+    } = options;
+    const escapedOrigin = escapeODataString(sapOrigin);
+    const escapedInstanceId = escapeODataString(instanceId);
+    const specs: BatchGetSpec[] = [
+        {
+            key: 'Description',
+            url: `${taskEntityPath}/Description?sap-client=${sapClient}`,
+            kind: 'single',
+            optional: true,
+        },
+        {
+            key: 'CustomAttributeData',
+            url: `${taskEntityPath}/CustomAttributeData?sap-client=${sapClient}`,
+            kind: 'collection',
+            optional: true,
+        },
+        {
+            key: 'DecisionOptions',
+            url: `DecisionOptions?sap-client=${sapClient}&SAP__Origin='${escapedOrigin}'&InstanceID='${escapedInstanceId}'`,
+            kind: 'collection',
+            optional: true,
+        },
+    ];
+
+    const boundary = `batch_ov_${Date.now()}_${Math.random().toString(16).slice(2, 10)}`;
+    const payload = buildBatchPayload(boundary, specs);
+    const payloadBuffer = Buffer.from(payload, 'utf8');
+    const response = await sendBatch(payloadBuffer, boundary);
+
+    const responseBody = toTextResponse(response.data);
+    const contentType = firstHeaderValue(response.headers, 'content-type');
+    const parts = parseBatchParts(responseBody, contentType);
+    if (parts.length < specs.length) {
+        throw new Error(
+            `Invalid $batch (overview) response for task ${instanceId}: expected ${specs.length} parts, got ${parts.length}.`
+        );
+    }
+
+    let description: SapDescriptionRaw | null = null;
+    let customAttributes: SapCustomAttributeRaw[] = [];
+    let decisionOptions: SapDecisionOptionRaw[] = [];
+
+    for (let i = 0; i < specs.length; i += 1) {
+        const spec = specs[i];
+        const part = parts[i];
+        if (part.status >= 400) {
+            const message = extractBatchPartMessage(part.body);
+            if (!spec.optional) {
+                throw new Error(`$batch (overview) part ${spec.key} failed (${part.status}): ${message}`);
+            }
+            if (logWarning) {
+                logWarning(
+                    `$batch (overview) part ${spec.key} failed for task ${instanceId} (${part.status}): ${message}`
+                );
+            }
+            continue;
+        }
+
+        switch (spec.key) {
+            case 'Description':
+                description = parseBatchSingle<SapDescriptionRaw>(part.body);
+                break;
+            case 'CustomAttributeData':
+                customAttributes = parseBatchCollection<SapCustomAttributeRaw>(part.body);
+                break;
+            case 'DecisionOptions':
+                decisionOptions = parseBatchCollection<SapDecisionOptionRaw>(part.body);
+                break;
+            default:
+                break;
+        }
+    }
+
+    return {
+        description,
+        customAttributes,
+        decisionOptions,
+    };
 }

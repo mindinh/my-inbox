@@ -26,6 +26,7 @@ import type {
 import type {
     TaskDetailBundle,
     TaskInformationBundle,
+    TaskOverviewBundle,
 } from '../../domain/inbox/inbox-task.models';
 
 /**
@@ -101,4 +102,29 @@ export function assembleActionResponse(
     message: string
 ): TaskActionResponse {
     return { success, message };
+}
+
+/**
+ * Assemble the fastest-possible overview response from an overview bundle.
+ * TaskObjects, comments, attachments, and logs are empty — loaded in background.
+ */
+export function assembleOverviewResponse(
+    identity: InboxIdentity,
+    bundle: TaskOverviewBundle,
+    businessContext: InboxTask['businessContext']
+): TaskDetailResponse {
+    const detail: TaskDetail = {
+        task: bundle.task,
+        description: bundle.description,
+        decisions: bundle.decisions,
+        customAttributes: bundle.customAttributes,
+        taskObjects: [],
+        comments: [],
+        processingLogs: [],
+        workflowLogs: [],
+        attachments: [],
+        businessContext,
+    };
+
+    return { identity, detail };
 }

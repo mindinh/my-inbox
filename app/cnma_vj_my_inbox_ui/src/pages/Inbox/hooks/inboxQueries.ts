@@ -92,6 +92,25 @@ export function useApprovedTasks(options?: { enabled?: boolean; top?: number; sk
     return query;
 }
 
+// ─── useTaskOverview (fast-path, 3-segment batch) ──────────
+export function useTaskOverview(
+    instanceId: string | null,
+    options?: {
+        enabled?: boolean;
+        hints?: { sapOrigin?: string; documentId?: string; businessObjectType?: string };
+    }
+) {
+    const query = useQuery({
+        queryKey: inboxKeys.taskOverview(instanceId || ''),
+        queryFn: () => inboxApi.getTaskOverview(instanceId!, options?.hints),
+        enabled: !!instanceId && options?.enabled !== false,
+        staleTime: STALE.OVERVIEW,
+    });
+
+    useErrorToast(query.error, 'Failed to load task overview');
+    return query;
+}
+
 // ─── useTaskInformation ────────────────────────────────────
 export function useTaskInformation(
     instanceId: string | null,
@@ -137,4 +156,21 @@ export function useWorkflowApprovalTree(
         enabled: !!instanceId && !!documentId && options?.enabled !== false,
         staleTime: STALE.WORKFLOW,
     });
+}
+
+// ─── usePrAttachments (Standalone PR API) ──────────────────
+export function usePrAttachments(
+    documentNumber: string | null | undefined,
+    sapOrigin?: string,
+    options?: { enabled?: boolean }
+) {
+    const query = useQuery({
+        queryKey: inboxKeys.prAttachments(documentNumber || '', sapOrigin),
+        queryFn: () => inboxApi.getPrAttachments(documentNumber!, sapOrigin),
+        enabled: !!documentNumber && options?.enabled !== false,
+        staleTime: STALE.DETAIL,
+    });
+
+    useErrorToast(query.error, 'Failed to load PR attachments');
+    return query;
 }

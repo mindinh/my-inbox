@@ -26,6 +26,13 @@ interface SapPrCommentRaw {
     Type?: string;
 }
 
+/** Raw shape from SAP ZI_PR_ATTACH_TAB entity */
+export interface SapPrAttachmentRaw {
+    File_Name?: string;
+    Mime_Type?: string;
+    File_Content?: string; // Base64-encoded binary
+    File_Size?: number;
+}
 interface ApprovalTreeConfig {
     servicePath: string;
     entitySet: string;
@@ -202,6 +209,135 @@ export class SapPurchaseRequisitionApprovalTreeClient {
         } catch (error) {
             console.warn(`[SapPRApprovalTree] Failed to add PR Comment for ${prNumber}: ${error instanceof Error ? error.message : String(error)}`);
             // we don't throw because decision execution should proceed
+        }
+    }
+
+    // ─── Attachment Operations ──────────────────────────────────
+
+    /**
+     * Fetch attachment metadata list for a PR document.
+     * Excludes File_Content to save bandwidth — content is fetched on-demand.
+     *
+     * @returns An array of attachment metadata objects for the given document.
+     */
+    async fetchPrAttachments(
+        documentNumber: string,
+        options?: { origin?: string; userJwt?: string }
+    ): Promise<SapPrAttachmentRaw[]> {
+        if (!this.enabled || !documentNumber) return [];
+        let docNum = documentNumber.trim();
+        if (!docNum) return [];
+
+        docNum = docNum.padStart(10, '0');
+        const config = this.resolveConfig(options?.origin);
+        const escapedDocNum = this.escapeODataString(docNum);
+
+        try {
+            const response = await this.get<ODataV4Collection<SapPrAttachmentRaw>>(
+                config,
+                `/ZI_PR_ATTACH_TAB(doc_num='${escapedDocNum}')`,
+                {
+                    '$select': 'File_Name,Mime_Type,File_Size',
+                    'sap-client': this.sapClient,
+                },
+                options?.userJwt
+            );
+
+            return response.value || [];
+        } catch (error) {
+            console.warn(`[SapPRApprovalTree] Failed to fetch PR Attachments for ${docNum}: ${error instanceof Error ? error.message : String(error)}`);
+            return [];
+        }
+    }
+
+    /**
+     * Fetch a single attachment's binary content by file name.
+     * The SAP API returns File_Content as a Base64-encoded string;
+     * this method converts it to a Buffer for the BFF to stream.
+     */
+    async fetchPrAttachmentContent(
+        documentNumber: string,
+        fileName: string,
+        options?: { origin?: string; userJwt?: string }
+    ): Promise<{ data: Buffer; contentType: string; fileName: string } | null> {
+        if (!this.enabled || !documentNumber || !fileName) return null;
+        let docNum = documentNumber.trim();
+        if (!docNum) return null;
+
+        docNum = docNum.padStart(10, '0');
+        const config = this.resolveConfig(options?.origin);
+        const escapedDocNum = this.escapeODataString(docNum);
+
+        try {
+            const response = await this.get<ODataV4Collection<SapPrAttachmentRaw>>(
+                config,
+                `/ZI_PR_ATTACH_TAB(doc_num='${escapedDocNum}')`,
+                {
+                    '$filter': `File_Name eq '${this.escapeODataString(fileName)}'`,
+                    'sap-client': this.sapClient,
+                },
+                options?.userJwt
+            );
+
+            const items = response.value || [];
+            const attachment = items.find((a) => a.File_Name === fileName);
+            if (!attachment || !attachment.File_Content) {
+                console.warn(`[SapPRApprovalTree] Attachment content not found for ${fileName} in PR ${docNum}`);
+                return null;
+            }
+
+            // Convert Base64 File_Content → Buffer
+            const data = Buffer.from(attachment.File_Content, 'base64');
+            const contentType = attachment.Mime_Type || 'application/octet-stream';
+
+            return { data, contentType, fileName: attachment.File_Name || fileName };
+        } catch (error) {
+            console.warn(`[SapPRApprovalTree] Failed to fetch PR Attachment content for ${fileName} in PR ${docNum}: ${error instanceof Error ? error.message : String(error)}`);
+            return null;
+        }
+    }
+
+    /**
+     * Upload a file attachment to a PR document.
+     * Converts the incoming Buffer to a Base64 string for the SAP OData V4 action.
+     */
+    async uploadPrAttachment(
+        documentNumber: string,
+        fileName: string,
+        mimeType: string,
+        buffer: Buffer,
+        options?: { origin?: string; userJwt?: string }
+    ): Promise<void> {
+        if (!this.enabled || !documentNumber) return;
+        let docNum = documentNumber.trim();
+        if (!docNum) return;
+
+        docNum = docNum.padStart(10, '0');
+        const config = this.resolveConfig(options?.origin);
+        const escapedDocNum = this.escapeODataString(docNum);
+
+        // Convert Buffer → Base64
+        const fileContentBase64 = buffer.toString('base64');
+
+        const payload: Record<string, string | number> = {
+            File_Name: fileName,
+            Mime_Type: mimeType,
+            File_Content: fileContentBase64,
+            File_Size: buffer.byteLength,
+        };
+
+        try {
+            await this.post(
+                config,
+                `/ZI_PR_ATTACH_TAB(doc_num='${escapedDocNum}')/SAP__self.upload`,
+                payload,
+                { 'sap-client': this.sapClient },
+                options?.userJwt
+            );
+            console.log(`[SapPRApprovalTree] Uploaded attachment "${fileName}" to PR ${docNum}`);
+        } catch (error) {
+            console.warn(`[SapPRApprovalTree] Failed to upload attachment to PR ${docNum}: ${error instanceof Error ? error.message : String(error)}`);
+            throw error; // Re-throw for upload so the caller can show an error
         }
     }
 

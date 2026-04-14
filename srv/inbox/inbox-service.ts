@@ -5,6 +5,7 @@ import {
     TaskActionResponse,
     DecisionRequest,
     InboxTask,
+    TaskAttachment,
     PurchaseRequisitionApprovalTreeResponse,
     DashboardResponse,
 } from '../types';
@@ -12,6 +13,7 @@ import {
     assembleTaskListResponse,
     assembleFullDetailResponse,
     assembleInformationResponse,
+    assembleOverviewResponse,
     assembleActionResponse,
 } from './handlers/task-response-assembler';
 import { ISapTaskClient, SapTaskClient } from './clients/sap-task-client';
@@ -261,6 +263,80 @@ export class InboxService {
             extractRequestorName(businessContext) || bundle.task.requestorName || bundle.task.createdByName;
 
         return assembleInformationResponse(identity, bundle, businessContext);
+    }
+
+    /**
+     * Get ultra-lightweight task overview for the fastest possible first render.
+     *
+     * Uses a 3-segment SAP $batch (vs 5 for getTaskInformation) to exclude
+     * the heavy TaskObjects and Attachments queries. The frontend loads those
+     * in the background after the overview renders.
+     *
+     * When the frontend forwards client hints (sapOrigin, documentId),
+     * the adapter skips the origin-lookup fetch and the service runs
+     * PR / PO enrichment in parallel — cutting total latency further.
+     */
+    async getTaskOverview(
+        identity: InboxIdentity,
+        instanceId: string,
+        executionContext?: ServiceExecutionContext,
+        clientHints?: { sapOrigin?: string; documentId?: string; businessObjectType?: string }
+    ): Promise<TaskDetailResponse> {
+        const adapterCtx = toAdapterContext(identity);
+
+        // When the caller already knows the document ID (e.g. PR number),
+        // we can start enrichment immediately — in parallel with the SAP
+        // $batch fetch — instead of waiting for the $batch result first.
+        const earlyEnrichPromise =
+            clientHints?.documentId && clientHints?.businessObjectType
+                ? enrichBusinessObjectData(
+                      identity,
+                      {
+                          type: clientHints.businessObjectType as 'PR' | 'PO',
+                          documentId: clientHints.documentId,
+                      },
+                      {
+                          sapOrigin: clientHints.sapOrigin,
+                          includeItemDetails: false,
+                          includePrInfo: true,
+                          includeApprovalTree: false,
+                      }
+                  ).catch(() => undefined)
+                : Promise.resolve(undefined);
+
+        const [bundle, earlyEnriched] = await Promise.all([
+            this.withSapReadLogging(
+                executionContext,
+                'fetchTaskOverview',
+                () => this.detailAdapter.fetchTaskOverview(adapterCtx, instanceId, clientHints)
+            ),
+            earlyEnrichPromise,
+        ]);
+
+        // If early enrichment was available, merge it. Otherwise fall back to
+        // the sequential path.
+        let businessContext;
+        if (earlyEnriched && earlyEnriched.documentId) {
+            businessContext = earlyEnriched;
+        } else {
+            const resolvedContext = resolveBusinessContext(
+                bundle.task,
+                bundle.customAttributes,
+                [] // No taskObjects in overview
+            );
+            businessContext = await enrichBusinessObjectData(identity, resolvedContext, {
+                sapOrigin: bundle.sapIdentifiers.sapOrigin,
+                includeItemDetails: false,
+                includePrInfo: true,
+                includeApprovalTree: false,
+            });
+        }
+
+        bundle.task.businessContext = businessContext;
+        bundle.task.requestorName =
+            extractRequestorName(businessContext) || bundle.task.requestorName || bundle.task.createdByName;
+
+        return assembleOverviewResponse(identity, bundle, businessContext);
     }
 
     async getPurchaseRequisitionApprovalTree(
@@ -554,6 +630,113 @@ export class InboxService {
         });
 
         console.log(`[InboxService] Attachment uploaded to task ${instanceId}: (${fileName})`);
+
+        return assembleActionResponse(true, `Attachment "${fileName}" uploaded successfully.`);
+    }
+
+    // ─── PR Attachment Operations (Standalone API) ────────────
+
+    /**
+     * Get PR attachment metadata list via the standalone ZI_PR_ATTACH_TAB API.
+     * Returns metadata only (no file content) for fast loading.
+     */
+    async getPrAttachments(
+        identity: InboxIdentity,
+        documentNumber: string,
+        sapOrigin?: string
+    ): Promise<TaskAttachment[]> {
+        if (this.isMockMode()) {
+            return [];
+        }
+
+        const rawAttachments = await this.prApprovalTreeClient.fetchPrAttachments(
+            documentNumber,
+            { origin: sapOrigin, userJwt: identity.userJwt }
+        );
+
+        // Map raw SAP shape → internal TaskAttachment model
+        return rawAttachments.map((raw, index) => ({
+            id: `pr-att-${index}-${raw.File_Name || 'unknown'}`,
+            fileName: raw.File_Name,
+            fileDisplayName: raw.File_Name,
+            mimeType: raw.Mime_Type,
+            fileSize: raw.File_Size,
+        }));
+    }
+
+    /**
+     * Stream PR attachment binary content via the standalone ZI_PR_ATTACH_TAB API.
+     * Performs Base64-to-Buffer conversion when the user triggers a download.
+     */
+    async streamPrAttachmentContent(
+        identity: InboxIdentity,
+        documentNumber: string,
+        fileName: string,
+        sapOrigin?: string
+    ): Promise<{ data: Buffer; contentType: string; fileName: string }> {
+        const result = await this.prApprovalTreeClient.fetchPrAttachmentContent(
+            documentNumber,
+            fileName,
+            { origin: sapOrigin, userJwt: identity.userJwt }
+        );
+
+        if (!result) {
+            throw Object.assign(
+                new Error(`Attachment "${fileName}" not found for PR ${documentNumber}.`),
+                { httpStatus: 404 }
+            );
+        }
+
+        // File size guard
+        const maxSize = parseInt(process.env.MAX_ATTACHMENT_SIZE_MB || '10', 10) * 1024 * 1024;
+        if (result.data.byteLength > maxSize) {
+            throw Object.assign(
+                new Error(`Attachment exceeds maximum size of ${process.env.MAX_ATTACHMENT_SIZE_MB || '10'}MB.`),
+                { httpStatus: 413 }
+            );
+        }
+
+        // Infer MIME type from extension if SAP returns generic type
+        const contentType = (result.contentType === 'application/octet-stream' && result.fileName)
+            ? (inferMimeFromExtension(result.fileName) || result.contentType)
+            : result.contentType;
+
+        const cleanedFileName = cleanDuplicateExtension(result.fileName);
+
+        return { data: result.data, contentType, fileName: cleanedFileName || fileName };
+    }
+
+    /**
+     * Upload an attachment to a PR document via the standalone ZI_PR_ATTACH_TAB API.
+     * Performs Buffer-to-Base64 conversion for the SAP OData V4 action.
+     */
+    async uploadPrAttachment(
+        identity: InboxIdentity,
+        documentNumber: string,
+        fileName: string,
+        mimeType: string,
+        buffer: Buffer,
+        sapOrigin?: string
+    ): Promise<TaskActionResponse> {
+        const maxSizeMB = parseInt(process.env.MAX_ATTACHMENT_SIZE_MB || '10', 10);
+        const maxSizeBytes = maxSizeMB * 1024 * 1024;
+
+        if (buffer.byteLength > maxSizeBytes) {
+            throw Object.assign(
+                new Error(`File exceeds maximum size of ${maxSizeMB}MB.`),
+                { httpStatus: 413 }
+            );
+        }
+
+        await this.prApprovalTreeClient.uploadPrAttachment(
+            documentNumber,
+            fileName,
+            mimeType,
+            buffer,
+            { origin: sapOrigin, userJwt: identity.userJwt }
+        );
+
+        console.log(`[InboxService] PR Attachment uploaded to ${documentNumber}: (${fileName})`);
 
         return assembleActionResponse(true, `Attachment "${fileName}" uploaded successfully.`);
     }

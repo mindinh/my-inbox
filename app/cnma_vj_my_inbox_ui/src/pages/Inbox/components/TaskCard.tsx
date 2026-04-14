@@ -44,6 +44,7 @@ export function TaskCard({
             ? task.businessContext.type
             : 'Workflow';
     const contextId = task.businessContext?.documentId || task.instanceId;
+    const isPrTask = task.businessContext?.type === 'PR';
     const chips = useBusinessChips(task);
 
     if (variant === 'mobile') {
@@ -57,7 +58,7 @@ export function TaskCard({
                     'shadow-[0_1px_2px_rgba(15,23,42,0.06)] hover:border-slate-300 hover:shadow-[0_10px_24px_rgba(15,23,42,0.08)]',
                     isSelected &&
                     'border-primary/35 bg-[linear-gradient(180deg,rgba(255,247,247,0.98)_0%,rgba(255,255,255,1)_100%)] ring-1 ring-primary/10 shadow-[0_14px_30px_rgba(193,0,0,0.08)]',
-                    !isSelected && (task.priority === 'HIGH' || task.priority === 'VERY_HIGH') &&
+                    !isSelected && (task.priority === 'HIGH' || task.priority === 'VERY_HIGH' || isPrTask) &&
                     'before:absolute before:left-0 before:top-0 before:bottom-0 before:w-1 before:bg-destructive'
                 )}
             >
@@ -139,7 +140,8 @@ export function TaskCard({
                 'hover:-translate-y-[1px] hover:border-slate-300 hover:shadow-[0_12px_24px_rgba(15,23,42,0.08)]',
                 'before:absolute before:bottom-0 before:left-0 before:top-0 before:w-1 before:rounded-r-full before:bg-transparent before:transition-colors',
                 isSelected &&
-                'border-primary/35 bg-[linear-gradient(180deg,rgba(193,0,0,0.04)_0%,rgba(255,255,255,0.98)_100%)] ring-1 ring-primary/10 before:bg-primary'
+                'border-primary/35 bg-[linear-gradient(180deg,rgba(193,0,0,0.04)_0%,rgba(255,255,255,0.98)_100%)] ring-1 ring-primary/10 before:bg-primary',
+                !isSelected && isPrTask && 'before:bg-destructive'
             )}
         >
             {task.priority === 'VERY_HIGH' && (
