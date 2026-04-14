@@ -32,7 +32,7 @@ export interface SapPrAttachmentRaw {
     attach_id?: string;
     file_name?: string;
     mime_type?: string;
-    file_content?: string; // Base64-encoded binary
+    file_content?: string; // Base64 or hex-encoded binary (auto-detected on decode)
     file_size?: number;
     created_by?: string;
     created_on?: string;
@@ -257,48 +257,50 @@ export class SapPurchaseRequisitionApprovalTreeClient {
     }
 
     /**
-     * Fetch a single attachment's binary content by file name.
-     * The SAP API returns File_Content as a Base64-encoded string;
-     * this method converts it to a Buffer for the BFF to stream.
+     * Fetch a single attachment's binary content by attach_id.
+     * The SAP API returns file_content as either base64 or hex-encoded;
+     * this method auto-detects the encoding and converts to a Buffer.
      */
     async fetchPrAttachmentContent(
         documentNumber: string,
-        fileName: string,
+        attachId: string,
         options?: { origin?: string; userJwt?: string }
     ): Promise<{ data: Buffer; contentType: string; fileName: string } | null> {
-        if (!this.enabled || !documentNumber || !fileName) return null;
+        if (!this.enabled || !documentNumber || !attachId) return null;
         let docNum = documentNumber.trim();
         if (!docNum) return null;
 
         docNum = docNum.padStart(10, '0');
         const config = this.resolveConfig(options?.origin);
         const escapedDocNum = this.escapeODataString(docNum);
+        const escapedAttachId = this.escapeODataString(attachId);
 
         try {
             const response = await this.get<ODataV4Collection<SapPrAttachmentRaw>>(
                 config,
                 `/ZI_PR_ATTACHMENTS`,
                 {
-                    '$filter': `doc_num eq '${escapedDocNum}' and file_name eq '${this.escapeODataString(fileName)}'`,
+                    '$filter': `doc_num eq '${escapedDocNum}' and attach_id eq ${escapedAttachId}`,
+                    '$select': 'file_content,file_name,mime_type',
                     'sap-client': this.sapClient,
                 },
                 options?.userJwt
             );
 
             const items = response.value || [];
-            const attachment = items.find((a) => a.file_name === fileName);
+            const attachment = items[0];
             if (!attachment || !attachment.file_content) {
-                console.warn(`[SapPRApprovalTree] Attachment content not found for ${fileName} in PR ${docNum}`);
+                console.warn(`[SapPRApprovalTree] Attachment content not found for attach_id=${attachId} in PR ${docNum}`);
                 return null;
             }
 
-            // Convert Base64 file_content → Buffer
-            const data = Buffer.from(attachment.file_content, 'base64');
+            // SAP may return file_content as base64 OR hex — auto-detect
+            const data = decodeFileContent(attachment.file_content);
             const contentType = attachment.mime_type || 'application/octet-stream';
 
-            return { data, contentType, fileName: attachment.file_name || fileName };
+            return { data, contentType, fileName: attachment.file_name || attachId };
         } catch (error) {
-            console.warn(`[SapPRApprovalTree] Failed to fetch PR Attachment content for ${fileName} in PR ${docNum}: ${error instanceof Error ? error.message : String(error)}`);
+            console.warn(`[SapPRApprovalTree] Failed to fetch PR Attachment content for attach_id=${attachId} in PR ${docNum}: ${error instanceof Error ? error.message : String(error)}`);
             return null;
         }
     }
@@ -326,10 +328,10 @@ export class SapPurchaseRequisitionApprovalTreeClient {
         const fileContentBase64 = buffer.toString('base64');
 
         const payload: Record<string, string | number> = {
-            File_Name: fileName,
-            Mime_Type: mimeType,
-            File_Content: fileContentBase64,
-            File_Size: buffer.byteLength,
+            file_name: fileName,
+            mime_type: mimeType,
+            file_content: fileContentBase64,
+            file_size: buffer.byteLength,
         };
 
         try {
@@ -465,4 +467,29 @@ export class SapPurchaseRequisitionApprovalTreeClient {
             return {};
         }
     }
+}
+
+/**
+ * Auto-detect whether SAP returned file_content as hex or base64.
+ *
+ * OData V4 Edm.Binary should be base64, but the ZI_PR_ATTACHMENTS entity
+ * sometimes returns hex-encoded binary (e.g. PDF content starting with
+ * "255044462D" = "%PDF-" in hex). Base64 strings will always contain
+ * characters outside the hex range (G-Z, g-z, +, /, =).
+ */
+function decodeFileContent(content: string): Buffer {
+    // Some SAP configurations might return data URI prefixes (e.g. data:application/pdf;base64,...)
+    // If present, strip it out before decoding
+    let cleanContent = content;
+    const dataUriMatch = cleanContent.match(/^data:.*?;base64,(.*)$/i);
+    if (dataUriMatch) {
+        cleanContent = dataUriMatch[1];
+    }
+
+    // If only hex chars (0-9, a-f, A-F) and even length → hex-encoded
+    if (cleanContent.length % 2 === 0 && /^[0-9a-fA-F]+$/.test(cleanContent)) {
+        return Buffer.from(cleanContent, 'hex');
+    }
+    // Otherwise treat as base64
+    return Buffer.from(cleanContent, 'base64');
 }

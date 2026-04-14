@@ -60,7 +60,7 @@ export const ALLOWED_ATTACHMENT_TYPES = [
     'application/vnd.oasis.opendocument.presentation',
 ] as const;
 
-export const MAX_ATTACHMENT_SIZE_MB = 10;
+export const MAX_ATTACHMENT_SIZE_MB = 5;
 export const MAX_ATTACHMENT_SIZE_BYTES = MAX_ATTACHMENT_SIZE_MB * 1024 * 1024;
 
 // ─── Query Stale Times ─────────────────────────────────────

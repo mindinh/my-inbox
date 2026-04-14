@@ -106,16 +106,16 @@ export function AttachmentsPanel({
         }
     };
 
-    const getPreviewUrl = (attachmentId: string, fileName?: string) => {
+    const getPreviewUrl = (attachmentId: string, _fileName?: string) => {
         if (isPR && documentNumber) {
-            return inboxApi.getPrAttachmentContentUrl(documentNumber, fileName || attachmentId, sapOrigin, 'inline');
+            return inboxApi.getPrAttachmentContentUrl(documentNumber, attachmentId, sapOrigin, 'inline');
         }
         return inboxApi.getAttachmentContentUrl(instanceId, attachmentId, 'inline');
     };
 
-    const getDownloadUrl = (attachmentId: string, fileName?: string) => {
+    const getDownloadUrl = (attachmentId: string, _fileName?: string) => {
         if (isPR && documentNumber) {
-            return inboxApi.getPrAttachmentContentUrl(documentNumber, fileName || attachmentId, sapOrigin, 'attachment');
+            return inboxApi.getPrAttachmentContentUrl(documentNumber, attachmentId, sapOrigin, 'attachment');
         }
         return inboxApi.getAttachmentContentUrl(instanceId, attachmentId, 'attachment');
     };

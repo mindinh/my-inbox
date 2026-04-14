@@ -364,7 +364,7 @@ export function ActivityPanel({ detail }: { detail: TaskDetail }) {
 
 // ─── Tab Definitions ───────────────────────────────────────
 
-export function makeTabDefinitions(detail: TaskDetail, workflowCount = 0, workflowComments?: WorkflowApprovalComment[], t?: any) {
+export function makeTabDefinitions(detail: TaskDetail, workflowCount = 0, workflowComments?: WorkflowApprovalComment[], t?: any, prAttachmentCount?: number) {
     const poFacts = detail.businessContext?.po as PurchaseOrderFactsheetData | undefined;
     const poFactsCount =
         (poFacts?.items?.length || 0) +
@@ -372,6 +372,9 @@ export function makeTabDefinitions(detail: TaskDetail, workflowCount = 0, workfl
         (poFacts?.scheduleLines?.length || 0);
 
     const mergedCommentsCount = mergeAndDeduplicateComments(detail.comments, workflowComments).length;
+
+    // For PR tasks, use the count from the standalone PR attachment API
+    const attachmentCount = prAttachmentCount ?? detail.attachments.length;
 
     return [
         {
@@ -392,7 +395,7 @@ export function makeTabDefinitions(detail: TaskDetail, workflowCount = 0, workfl
             icon: GitBranch,
             count: workflowCount,
         },
-        { value: 'attachments', label: t ? t('task.attachments', 'Attachments') : 'Attachments', icon: Paperclip, count: detail.attachments.length },
+        { value: 'attachments', label: t ? t('task.attachments', 'Attachments') : 'Attachments', icon: Paperclip, count: attachmentCount },
         { value: 'comments', label: t ? t('task.comments', 'Comments') : 'Comments', icon: MessageSquare, count: mergedCommentsCount },
     ] as const;
 }

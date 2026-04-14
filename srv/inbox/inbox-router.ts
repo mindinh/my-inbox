@@ -328,31 +328,34 @@ export function createInboxRouter(): Router {
         res.json({ attachments, count: attachments.length });
     }));
 
-    // GET /pr/:docNum/attachments/:fileName/content — Download PR attachment content
-    router.get('/pr/:docNum/attachments/:fileName/content', asyncHandler(async (req: Request, res: Response) => {
+    // GET /pr/:docNum/attachments/:attachId/content — Download PR attachment content
+    router.get('/pr/:docNum/attachments/:attachId/content', asyncHandler(async (req: Request, res: Response) => {
         const identity = resolveAndValidateIdentity(req);
         const service = getInboxService();
         const docNum = req.params.docNum as string;
-        const fileName = decodeURIComponent(req.params.fileName as string);
+        const attachId = decodeURIComponent(req.params.attachId as string);
         const sapOrigin = req.query.sapOrigin as string | undefined;
         const disposition = (req.query.disposition as string) || 'inline';
 
         const { data, contentType, fileName: resolvedFileName } =
-            await service.streamPrAttachmentContent(identity, docNum, fileName, sapOrigin);
+            await service.streamPrAttachmentContent(identity, docNum, attachId, sapOrigin);
 
         res.setHeader('Content-Type', contentType);
         if (resolvedFileName) {
             const dispositionType = disposition === 'attachment' ? 'attachment' : 'inline';
-            res.setHeader('Content-Disposition', `${dispositionType}; filename="${encodeURIComponent(resolvedFileName)}"`);
+            res.setHeader(
+                'Content-Disposition',
+                `${dispositionType}; filename="${resolvedFileName.replace(/"/g, '\\"')}"; filename*=UTF-8''${encodeURIComponent(resolvedFileName)}`
+            );
         }
         res.setHeader('Content-Length', data.byteLength);
-        res.send(data);
+        res.end(data);
     }));
 
     // POST /pr/:docNum/attachments — Upload PR attachment
     router.post(
         '/pr/:docNum/attachments',
-        express.raw({ limit: '10mb', type: '*/*' }),
+        express.raw({ limit: '5mb', type: '*/*' }),
         asyncHandler(async (req: Request, res: Response) => {
             const identity = resolveAndValidateIdentity(req);
             const service = getInboxService();
