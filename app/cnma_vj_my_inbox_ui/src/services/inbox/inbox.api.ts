@@ -284,4 +284,13 @@ export const inboxApi = {
         );
         return data;
     },
+
 };
+
+/**
+ * Perform logout via the approuter's built-in /do/logout endpoint.
+ * The approuter clears the session cookie and redirects through XSUAA/IAS logout.
+ */
+export function performLogout(): void {
+    window.location.href = '/do/logout';
+}

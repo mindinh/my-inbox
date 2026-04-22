@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useRef, useState, useCallback } from 'react';
 import { AlertTriangle, LogOut, RefreshCw } from 'lucide-react';
+import { performLogout } from '@/services/inbox/inbox.api';
 
 // ─── Configuration ────────────────────────────────────────────────
 const IDLE_TIMEOUT_MS = 25 * 60 * 1000; // 25 minutes
@@ -24,7 +25,7 @@ export function triggerSessionExpiredGlobal() {
     if (globalTrigger) {
         globalTrigger();
     } else {
-        window.location.href = '/do/logout';
+        performLogout();
     }
 }
 
@@ -40,7 +41,7 @@ export function SessionTimeoutProvider({ children }: { children: React.ReactNode
     const lastActivityRef = useRef(Date.now());
 
     const handleLogout = useCallback(() => {
-        window.location.href = '/do/logout';
+        performLogout();
     }, []);
 
     const clearAllTimers = useCallback(() => {

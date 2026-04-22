@@ -16,6 +16,7 @@ import { cn } from '@/utils/cn';
 import type { LucideIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useCurrentUser } from '@/pages/Inbox/hooks/inboxQueries';
+import { performLogout } from '@/services/inbox/inbox.api';
 
 // ── Nav config types ──────────────────────────────────────────────
 
@@ -239,7 +240,7 @@ export function MainLayout() {
                 </div>
               )}
               <button
-                onClick={() => { window.location.href = '/do/logout'; }}
+                onClick={() => { performLogout(); }}
                 className={cn(
                   "p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-sidebar-accent transition-colors",
                   isCollapsed ? "mt-2" : ""

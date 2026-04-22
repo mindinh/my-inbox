@@ -1,8 +1,9 @@
-import { ClipboardCheck, ChevronLeft, ChevronRight, Home, Inbox, LayoutDashboard, X } from 'lucide-react';
+import { ClipboardCheck, ChevronLeft, ChevronRight, Home, Inbox, LayoutDashboard, LogOut, X } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { useTranslation } from 'react-i18next';
 import { motion, AnimatePresence } from 'framer-motion';
+import { performLogout } from '@/services/inbox/inbox.api';
 
 type TaskScope = 'my' | 'approved' | 'dashboard' | 'home';
 
@@ -235,6 +236,18 @@ export function MobileSidebarSheet({
                                 );
                             })}
                         </nav>
+
+                        {/* Logout Button */}
+                        <div className="mt-auto border-t border-border px-5 py-4">
+                            <button
+                                type="button"
+                                onClick={() => { performLogout(); }}
+                                className="flex w-full items-center gap-4 px-3 py-3 rounded-lg text-[15px] font-medium text-red-600 hover:bg-red-50 transition-colors"
+                            >
+                                <LogOut className="w-5 h-5 flex-shrink-0" aria-hidden="true" />
+                                <span>{t('nav.logOut', 'Log Out')}</span>
+                            </button>
+                        </div>
                     </motion.div>
                 </>
             )}

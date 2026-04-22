@@ -3,7 +3,8 @@
   "authenticationMethod": "route",
   "sessionTimeout": 60,
   "logout": {
-    "logoutEndpoint": "/do/logout"
+    "logoutEndpoint": "/do/logout",
+    "logoutPage": "/"
   },
   "routes": [
     {

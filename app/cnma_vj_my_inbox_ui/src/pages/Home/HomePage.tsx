@@ -11,7 +11,9 @@ import {
     CheckCheck,
     ChevronRight,
     Layers,
+    LogOut,
 } from 'lucide-react';
+import { performLogout } from '@/services/inbox/inbox.api';
 import { MobileSidebarSheet } from '@/pages/Inbox/components/TaskScopeSidebar';
 import { useIsMobile } from '@/components/ui/use-mobile';
 import { useDashboardQuery, normalizeDashboardStatus } from '@/pages/Dashboard/use-dashboard-data';
@@ -94,7 +96,7 @@ export default function HomePage() {
                     background: 'linear-gradient(135deg, var(--primary) 0%, var(--primary-hover) 100%)',
                 }}
             >
-                {/* Hamburger */}
+                {/* Hamburger + Logout */}
                 <div className="flex items-center justify-between mb-3">
                     <button
                         onClick={() => setMobileMenuOpen(true)}
@@ -102,6 +104,13 @@ export default function HomePage() {
                         aria-label="Open navigation menu"
                     >
                         <Menu size={22} className="text-white" />
+                    </button>
+                    <button
+                        onClick={() => { performLogout(); }}
+                        className="flex items-center justify-center w-9 h-9 rounded-lg transition-colors hover:bg-white/10 active:bg-white/20"
+                        aria-label={t('nav.logOut', 'Log Out')}
+                    >
+                        <LogOut size={20} className="text-white" />
                     </button>
                 </div>
 

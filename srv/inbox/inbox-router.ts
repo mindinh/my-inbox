@@ -36,6 +36,30 @@ const authRuntimeConfig = resolveAuthRuntimeConfig();
 export function createInboxRouter(): Router {
     const router = Router();
 
+    // GET /logout-url — Construct XSUAA logout URL from bound service credentials
+    // Frontend passes its own origin via ?appOrigin= so redirect goes to approuter, not srv.
+    router.get('/logout-url', asyncHandler(async (req: Request, res: Response) => {
+        try {
+            const vcapServices = JSON.parse(process.env.VCAP_SERVICES || '{}');
+            const xsuaaCreds = vcapServices.xsuaa?.[0]?.credentials;
+
+            if (!xsuaaCreds?.url || !xsuaaCreds?.clientid) {
+                res.json({ logoutUrl: '/do/logout' });
+                return;
+            }
+
+            // Use the appOrigin from the frontend (approuter URL)
+            const appOrigin = (req.query.appOrigin as string) || '';
+            const redirectAfterLogout = appOrigin || '/';
+            const logoutUrl = `${xsuaaCreds.url}/logout.do?redirect=${encodeURIComponent(redirectAfterLogout)}&client_id=${encodeURIComponent(xsuaaCreds.clientid)}`;
+
+            res.json({ logoutUrl });
+        } catch (err) {
+            console.error('[InboxRouter] Failed to build logout URL:', err);
+            res.json({ logoutUrl: '/do/logout' });
+        }
+    }));
+
     // GET /debug/current-user
     router.get('/debug/current-user', asyncHandler(async (req: Request, res: Response) => {
         const identity = resolveIdentity(req);
